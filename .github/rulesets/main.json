@@ -39,6 +39,17 @@
         "required_review_thread_resolution": true
       },
       "type": "pull_request"
+    },
+    {
+      "parameters": {
+        "required_status_checks": [
+          {
+            "context": "Verification gate"
+          }
+        ],
+        "strict_required_status_checks_policy": true
+      },
+      "type": "required_status_checks"
     }
   ],
   "target": "branch"
