@@ -2,11 +2,11 @@
 -include .config/praetor/engine.mk
 # Praetor ships one binary under two names; resolve whichever is installed.
 PRAETORCTL ?= $(shell command -v praetorctl 2>/dev/null || command -v standardsctl 2>/dev/null || echo praetorctl)
-.PHONY: all verify-all compile-context compile-context-verify caveman-sources audit build test
+.PHONY: all verify-all compile-context compile-context-verify caveman-sources audit secrets build test
 
 all: build
 
-verify-all: compile-context-verify caveman-sources audit test
+verify-all: compile-context-verify caveman-sources audit secrets test
 
 compile-context:
 	@$(PRAETORCTL) compile-context
@@ -20,6 +20,8 @@ caveman-sources:
 audit:
 	@$(PRAETORCTL) audit
 
+secrets:
+	@if command -v gitleaks >/dev/null 2>&1; then $(PRAETORCTL) security secrets; else echo gitleaks is not installed, install it with mise use --global gitleaks@8.30.1 or the gitleaks v8.30.1 release archive binary - a Go-built gitleaks lacks the version stamp and shadows the pinned binary when earlier on PATH e.g. ~/go/bin >&2; exit 1; fi
 test: build
 	@printf '%s\n' 'test: not applicable: no build system; verify-all checks agent context, caveman sources and audit.'
 
