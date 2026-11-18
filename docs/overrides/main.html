@@ -12,6 +12,8 @@
       Every identity value comes from the site's mkdocs.yml, never from this template, so
       the site that renders it (an adopter's fork, or this repository's own docs) names
       itself: author is site_author, or site_name when site_author is unset.
+      The home page's headline is site_name: its page.title is the nav label (Home), and
+      its front matter sets no title, so the browser title shows site_name once.
       `praetorctl seo audit site` validates the rendered blocks. -#}
   {% if page %}
   <!-- Pre-wired Schema.org JSON-LD structured data -->
@@ -19,7 +21,7 @@
   {
     "@context": "https://schema.org",
     "@type": "TechArticle",
-    "headline": {{ (page.title or config.site_name) | tojson }},
+    "headline": {{ ((config.site_name if page.is_homepage else page.title) or config.site_name) | tojson }},
     "description": {{ ((page.meta and page.meta.description) or config.site_description) | tojson }},
     {%- if page.canonical_url %}
     "url": {{ page.canonical_url | tojson }},
