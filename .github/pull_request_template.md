@@ -12,12 +12,13 @@
   or libav source, or source derived from it (forks, patch sets, ports,
   bindings, documentation in their source trees).
 - [ ] Every input I used is listed below and is allowed for the role I held,
-  as the Allowed inputs and Roles tables in CLEANROOM.md define it. As
-  implementer, I used only the inputs marked for both roles and no
+  as the Allowed inputs and Roles tables in CLEANROOM.md define it. If I held
+  the implementer role, I used only the inputs marked for both roles and no
   measurements of my own: other programs' behaviour reached me only through
-  spec notes and committed fixtures. A change that
-  touches no component (documentation, plan) uses only the inputs the
-  Allowed inputs table lists.
+  spec notes and committed fixtures. If I held the spec-writer role, every
+  black-box measurement I made is listed below. A change that touches no
+  component (documentation, plan) uses only the inputs the Allowed inputs
+  table lists.
 
 **Inputs used** (document and clause, spec note, or measurement):
 

@@ -44,8 +44,10 @@ conformance manifest format.
 1. `make verify-all` runs the Rust steps and exits 0 on the default branch.
 2. The attestation check has committed fixtures in both directions: a
    complete attestation passes, and a missing block, an unchecked box and an
-   empty or placeholder field each fail. A planted pull request without an
-   attestation block fails the check on the forge, and is closed unmerged
+   empty or placeholder field each fail. The check runs again whenever a
+   pull request's description is edited. A planted pull request without an
+   attestation block fails the check on the forge, and so does one whose
+   passing attestation is then deleted by an edit; each is closed unmerged
    once the failure is recorded. The check is then added to the required
    status checks in `.github/rulesets/main.json`.
 3. The provenance scan fails a planted file whose header names FFmpeg as its

@@ -37,9 +37,11 @@ Matroska demuxer, and AV1 starts after the pipeline milestone M4.
   mux; filters follow in M4. The EBML and Matroska
   crates carry FLAC, Opus and AV1 later. Lossless decoding gives exact tests
   from the first milestone.
-- **Negative**: The first slice serves few end users; AV1, the codec with the
-  widest use, waits until M6. FFV1 test streams come from an encoder run as a
-  black box, because no published FFV1 conformance set exists yet.
+- **Negative**: The first slice serves few end users; AV1, the first lossy
+  video codec on the ladder, waits until M6
+  ([milestones](../plan/milestones.md)). FFV1 test streams come from an
+  encoder run as a black box, because RFC 9043 defines no conformance
+  streams or test vectors.
 
 **Revisit when** FFV1 test streams cannot be produced without inputs that
 [CLEANROOM.md](../../CLEANROOM.md) forbids, or when the first consumer needs a

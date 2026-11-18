@@ -160,8 +160,19 @@ Checks 2 and 3 are planned for milestone M0 in
 [docs/plan/milestones.md](docs/plan/milestones.md). Each joins the required
 status checks in [.github/rulesets/main.json](.github/rulesets/main.json)
 when it lands, so a pull request cannot merge without passing it. Until
-then, review is the only check, and the maintainer reads every attestation
-before merging.
+then, review is the only check. Only the maintainer has write access to the
+repository, so every merge passes through the maintainer's review, and no
+other contributor gets write access before both checks are required.
+
+The ruleset lets the repository admin role bypass it when merging a pull
+request, because the repository has a single maintainer and requires no
+approvals. That bypass is never used to merge a pull request whose
+clean-room check has failed or has not finished. The forge records every
+bypass, and the maintainer reads that record when each milestone closes
+(`GET /repos/{owner}/{repo}/rulesets/rule-suites` with
+`rule_suite_result=bypass`). A pull request found merged through the bypass
+without a passing clean-room check is reviewed again, and handled as
+contamination (below) if its attestation does not hold.
 
 No check proves that a complete attestation is true. A missing or incomplete
 attestation meets two checks (1 and 2), and so does copied code that kept its
@@ -178,13 +189,17 @@ work or someone else's:
 1. Stop work on the affected component and say so in the pull request or an
    issue. Describe what was read and when, but do not quote or link the
    forbidden material.
-2. The maintainer marks the affected files and commits.
-3. A contributor who has not seen the material rewrites them from the
+2. The maintainer pauses merges that touch the affected component and
+   checks every open pull request. One whose branch contains the affected
+   commits, or that changes the affected files, is closed or rebased onto a
+   clean base before further work on the component is merged.
+3. The maintainer marks the affected files and commits.
+4. A contributor who has not seen the material rewrites them from the
    specifications, or the change is reverted.
-4. The contaminated contributor or session leaves the component, and the
+5. The contaminated contributor or session leaves the component, and the
    incident is recorded in a contamination log that the first incident
    creates under `docs/cleanroom/`.
-5. Published history is not rewritten by default. The ruleset forbids force
+6. Published history is not rewritten by default. The ruleset forbids force
    pushes to `main`, and existing clones and forks already hold the commits,
    so a rewrite would not remove the material. The contamination log names
    the affected commits, and no later work builds on them. If a case needs
