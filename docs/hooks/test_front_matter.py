@@ -6,8 +6,7 @@
 
 from __future__ import annotations
 
-import importlib.util
-import logging
+import importlib
 import sys
 import types
 from pathlib import Path
@@ -15,13 +14,9 @@ from pathlib import Path
 from mkdocs.utils.meta import get_data
 
 ROOT = Path(sys.argv[1]).resolve()
-SPEC = importlib.util.spec_from_file_location(
-    "front_matter", ROOT / "docs/hooks/front_matter.py"
-)
-if SPEC is None or SPEC.loader is None:
-    raise RuntimeError("Failed to load docs/hooks/front_matter.py")
-MOD = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(MOD)
+sys.path.append(str(ROOT / "docs/hooks"))
+hooktest = importlib.import_module("hooktest")
+MOD = hooktest.load_hook(ROOT, "front_matter")
 
 # (case name, raw page source, warnings).
 CASES: list[tuple[str, str, int]] = [
@@ -45,19 +40,6 @@ CASES: list[tuple[str, str, int]] = [
     ("no closing line", "---\ndescription: a: b\n\n# T\n", 0),
     ("thematic break after a heading", "# T\n\n---\n\ntext\n---\n", 0),
 ]
-
-
-class _ListHandler(logging.Handler):
-    """Capture warning records emitted by the hook logger during a test case."""
-
-    def __init__(self) -> None:
-        """Start with no captured messages at warning level."""
-        super().__init__(level=logging.WARNING)
-        self.messages: list[str] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        """Store the formatted message of one log record."""
-        self.messages.append(record.getMessage())
 
 
 class _UnreadableFile:
@@ -87,13 +69,8 @@ def _run_case(name: str, src: str, want_warns: int) -> bool:
         file=file,
     )
     markdown = get_data(src)[0]
-    logger = logging.getLogger("mkdocs.hooks.front_matter")
-    handler = _ListHandler()
-    logger.addHandler(handler)
-    try:
+    with hooktest.capture_warnings("mkdocs.hooks.front_matter") as handler:
         out = MOD.on_page_markdown(markdown, page, {}, None)
-    finally:
-        logger.removeHandler(handler)
     ok = out == markdown and len(handler.messages) == want_warns
     detail = "" if ok else f"-> warns={handler.messages!r} changed={out != markdown}"
     print("ok  " if ok else "FAIL", name, detail)
