@@ -28,6 +28,19 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from markdown_it.token import Token
+
+_MISSING_PARSER_ERROR: str = (
+    "markdown-it-py is not installed; install tools/cleanroom/requirements.txt"
+)
+
+try:
+    from markdown_it import MarkdownIt
+except ImportError:
+    _PARSER: MarkdownIt | None = None
+else:
+    _PARSER = MarkdownIt("commonmark").enable("table")
+
 MAX_BODY_CHARS: int = 65536
 ATTESTATION_HEADING: str = "clean-room attestation"
 PLACEHOLDERS: frozenset[str] = frozenset(
@@ -43,13 +56,7 @@ PLACEHOLDERS: frozenset[str] = frozenset(
     }
 )
 
-_COMMENT_RE = re.compile(r"<!--(?:.*?-->|.*)", re.DOTALL)
-_FENCE_OPEN_RE = re.compile(r"^ {0,3}(?:(`{3,})[^`]*|(~{3,}).*)$")
-_FENCE_CLOSE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
-_HEADING_RE = re.compile(r"^ {0,3}(#{1,2})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
-_BOX_RE = re.compile(r"^[ \t]*[-*][ \t]+\[([ xX])\](?:[ \t]+(.*))?$")
-_FIELD_RE = re.compile(r"^\*\*([^*\n]+)\*\*")
-_BULLET_RE = re.compile(r"^[ \t]*[-*](?:[ \t]+(.*))?$")
+_BOX_MARKER_RE = re.compile(r"^\[([ xX])\](?:\s|$)")
 _URI_AUTOLINK_RE = re.compile(r"^<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>$")
 _EMAIL_AUTOLINK_RE = re.compile(
     r"^<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9]"
@@ -74,40 +81,6 @@ class Problem:
     detail: str
 
 
-def _collapse(parts: Sequence[str]) -> str:
-    """Join text parts and collapse whitespace runs to single spaces."""
-    return " ".join(" ".join(parts).split())
-
-
-def _strip_fenced_code(text: str) -> str:
-    """Drop CommonMark fenced code block lines in a single bounded pass."""
-    kept: list[str] = []
-    fence: str | None = None
-    for line in text.split("\n"):
-        if fence is None:
-            open_match = _FENCE_OPEN_RE.match(line)
-            if open_match is not None:
-                fence = open_match.group(1) or open_match.group(2)
-                continue
-            kept.append(line)
-        else:
-            close_match = _FENCE_CLOSE_RE.match(line)
-            if (
-                close_match is not None
-                and close_match.group(1)[0] == fence[0]
-                and len(close_match.group(1)) >= len(fence)
-            ):
-                fence = None
-    return "\n".join(kept)
-
-
-def _clean_text(raw: str) -> str:
-    """Normalise line endings and strip HTML comments and fenced code blocks."""
-    normalised = raw.replace("\r\n", "\n").replace("\r", "\n")
-    uncommented = _COMMENT_RE.sub("", normalised)
-    return _strip_fenced_code(uncommented)
-
-
 def is_placeholder(item: str) -> bool:
     """Return whether a list item's text is empty or a placeholder."""
     text = " ".join(item.split())
@@ -124,106 +97,191 @@ def is_placeholder(item: str) -> bool:
     return lowered in PLACEHOLDERS or lowered.rstrip(".:") in PLACEHOLDERS
 
 
-def _extract_blocks(text: str) -> list[list[str]]:
-    """Return the line lists of all Clean-Room Attestation sections in text."""
-    blocks: list[list[str]] = []
-    current: list[str] | None = None
-    for line in text.split("\n"):
-        match = _HEADING_RE.match(line)
-        if match is not None:
-            level = match.group(1)
-            title = (match.group(2) or "").strip()
-            if level == "##" and title.casefold() == ATTESTATION_HEADING:
+def _render_children(children: Sequence[Token]) -> str:
+    """Render inline child tokens to whitespace-collapsed plain text."""
+    parts: list[str] = []
+    for child in children:
+        if child.type in ("text", "code_inline"):
+            parts.append(child.content)
+        elif child.type in ("softbreak", "hardbreak"):
+            parts.append(" ")
+    return " ".join("".join(parts).split())
+
+
+def _render_inline(token: Token) -> str:
+    """Render an inline token's children to whitespace-collapsed plain text."""
+    return _render_children(token.children or ())
+
+
+def _field_label(inline_token: Token) -> str | None:
+    """Return the label of a field paragraph inline token, or None."""
+    children = [
+        child
+        for child in (inline_token.children or ())
+        if not (child.type == "text" and not child.content)
+    ]
+    if not children or children[0].type != "strong_open":
+        return None
+    inner: list[Token] = []
+    for child in children[1:]:
+        if child.type == "strong_close":
+            break
+        inner.append(child)
+    return _render_children(inner)
+
+
+def _extract_sections(text: str) -> list[list[Token]]:
+    """Parse text and return token slices for Clean-Room Attestation sections."""
+    if _PARSER is None:
+        raise RuntimeError(_MISSING_PARSER_ERROR)
+    tokens = _PARSER.parse(text)
+    sections: list[list[Token]] = []
+    current: list[Token] | None = None
+    skip_until = -1
+    for index, token in enumerate(tokens):
+        if index < skip_until:
+            continue
+        if token.type == "heading_open" and token.tag in ("h1", "h2"):
+            title = (
+                _render_inline(tokens[index + 1])
+                if index + 1 < len(tokens) and tokens[index + 1].type == "inline"
+                else ""
+            )
+            if (
+                token.level == 0
+                and token.tag == "h2"
+                and title.casefold() == ATTESTATION_HEADING
+            ):
                 current = []
-                blocks.append(current)
-            else:
-                current = None
+                sections.append(current)
+                skip_until = index + 3
+                continue
+            current = None
             continue
         if current is not None:
-            current.append(line)
-    return blocks
+            current.append(token)
+    return sections
 
 
-def _parse_boxes(lines: Sequence[str]) -> list[tuple[bool, str]]:
+def _parse_boxes(tokens: Sequence[Token]) -> list[tuple[bool, str]]:
     """Extract (checked, collapsed_text) checkboxes before the first field."""
     boxes: list[tuple[bool, str]] = []
-    active_parts: list[str] | None = None
-    active_checked = False
-    for line in lines:
-        if _FIELD_RE.match(line) is not None:
+    in_bullet_list = False
+    for index, token in enumerate(tokens):
+        if (
+            token.level == 0
+            and token.type == "paragraph_open"
+            and index + 1 < len(tokens)
+            and _field_label(tokens[index + 1]) is not None
+        ):
             break
-        box_match = _BOX_RE.match(line)
-        if box_match is not None:
-            if active_parts is not None:
-                boxes.append((active_checked, _collapse(active_parts)))
-            active_checked = box_match.group(1) in ("x", "X")
-            active_parts = [box_match.group(2) or ""]
-        elif not line.strip() or _BULLET_RE.match(line) is not None:
-            if active_parts is not None:
-                boxes.append((active_checked, _collapse(active_parts)))
-                active_parts = None
-        elif active_parts is not None:
-            active_parts.append(line.strip())
-    if active_parts is not None:
-        boxes.append((active_checked, _collapse(active_parts)))
+        if token.level == 0 and token.type == "bullet_list_open":
+            in_bullet_list = True
+        elif token.level == 0 and token.type == "bullet_list_close":
+            in_bullet_list = False
+        elif (
+            in_bullet_list
+            and token.level == 1
+            and token.type == "list_item_open"
+            and index + 2 < len(tokens)
+            and tokens[index + 1].type == "paragraph_open"
+            and tokens[index + 1].level == 2
+            and tokens[index + 2].type == "inline"
+        ):
+            inline_tok = tokens[index + 2]
+            match = _BOX_MARKER_RE.match(inline_tok.content)
+            if match is not None:
+                checked = match.group(1) in ("x", "X")
+                text = _render_inline(inline_tok)[3:].strip()
+                boxes.append((checked, text))
     return boxes
 
 
-def _parse_fields(lines: Sequence[str]) -> dict[str, list[str]]:
-    """Extract field labels and their collapsed list items from block lines."""
+def _collect_answer_token(
+    tokens: Sequence[Token],
+    index: int,
+    current_items: list[str],
+    bullet_stack: list[bool],
+    item_stack: list[tuple[int, int, list[str] | None]],
+) -> None:
+    """Update list and item stacks for one token inside a field answer region."""
+    token = tokens[index]
+    if token.type in ("bullet_list_open", "ordered_list_open"):
+        is_bullet = token.type == "bullet_list_open" and (
+            token.level == 0 or (bool(bullet_stack) and bullet_stack[-1])
+        )
+        bullet_stack.append(is_bullet)
+    elif token.type in ("bullet_list_close", "ordered_list_close"):
+        bullet_stack.pop()
+    elif token.type == "list_item_open":
+        if bullet_stack and bullet_stack[-1]:
+            current_items.append("")
+            item_stack.append((token.level, len(current_items) - 1, []))
+        else:
+            item_stack.append((token.level, -1, None))
+    elif token.type == "list_item_close":
+        _, slot, parts = item_stack.pop()
+        if parts is not None:
+            current_items[slot] = " ".join(part for part in parts if part)
+    elif (
+        token.type == "paragraph_open"
+        and item_stack
+        and item_stack[-1][2] is not None
+        and token.level == item_stack[-1][0] + 1
+        and index + 1 < len(tokens)
+        and tokens[index + 1].type == "inline"
+    ):
+        item_stack[-1][2].append(_render_inline(tokens[index + 1]))
+
+
+def _parse_fields(tokens: Sequence[Token]) -> dict[str, list[str]]:
+    """Extract field labels and their collapsed list items from section tokens."""
     fields: dict[str, list[str]] = {}
     current_items: list[str] | None = None
-    active_parts: list[str] | None = None
-    for line in lines:
-        field_match = _FIELD_RE.match(line)
-        if field_match is not None:
-            if current_items is not None and active_parts is not None:
-                current_items.append(_collapse(active_parts))
-            label = " ".join(field_match.group(1).split())
-            current_items = fields.setdefault(label, [])
-            active_parts = None
+    bullet_stack: list[bool] = []
+    item_stack: list[tuple[int, int, list[str] | None]] = []
+    skip_until = -1
+    for index, token in enumerate(tokens):
+        if index < skip_until:
             continue
-        if current_items is None:
-            continue
-        bullet_match = _BULLET_RE.match(line)
-        if bullet_match is not None:
-            if active_parts is not None:
-                current_items.append(_collapse(active_parts))
-            active_parts = [bullet_match.group(1) or ""]
-        elif not line.strip():
-            if active_parts is not None:
-                current_items.append(_collapse(active_parts))
-                active_parts = None
-        elif active_parts is not None:
-            active_parts.append(line.strip())
-    if current_items is not None and active_parts is not None:
-        current_items.append(_collapse(active_parts))
+        if token.level == 0 and token.type == "paragraph_open":
+            label = _field_label(tokens[index + 1]) if index + 1 < len(tokens) else None
+            if label is not None:
+                current_items = fields.setdefault(label, [])
+                skip_until = index + 3
+                continue
+        if current_items is not None:
+            _collect_answer_token(
+                tokens, index, current_items, bullet_stack, item_stack
+            )
     return fields
 
 
 def load_template(path: Path) -> TemplateSpec:
     """Derive the attestation box and field specification from template path."""
+    if _PARSER is None:
+        raise RuntimeError(_MISSING_PARSER_ERROR)
     try:
         raw = path.read_text(encoding="utf-8")
     except OSError as exc:
         msg = f"cannot read template {path}: {exc}"
         raise ValueError(msg) from exc
-    blocks = _extract_blocks(_clean_text(raw))
-    if len(blocks) != 1:
+    sections = _extract_sections(raw)
+    if len(sections) != 1:
         msg = f"template {path} must contain exactly one attestation section"
         raise ValueError(msg)
-    boxes = tuple(text for _, text in _parse_boxes(blocks[0]) if text)
-    fields = tuple(_parse_fields(blocks[0]).keys())
+    boxes = tuple(text for _, text in _parse_boxes(sections[0]) if text)
+    fields = tuple(_parse_fields(sections[0]).keys())
     if not boxes or not fields:
         msg = f"template {path} attestation section is missing boxes or fields"
         raise ValueError(msg)
     return TemplateSpec(boxes=boxes, fields=fields)
 
 
-def _check_boxes(spec: TemplateSpec, block: Sequence[str]) -> list[Problem]:
-    """Check that every template box is present and checked in block."""
+def _check_boxes(spec: TemplateSpec, section: Sequence[Token]) -> list[Problem]:
+    """Check that every template box is present and checked in section."""
     found: dict[str, bool] = {}
-    for checked, text in _parse_boxes(block):
+    for checked, text in _parse_boxes(section):
         found[text] = found.get(text, True) and checked
     problems: list[Problem] = []
     for index, expected in enumerate(spec.boxes, 1):
@@ -239,9 +297,9 @@ def _check_boxes(spec: TemplateSpec, block: Sequence[str]) -> list[Problem]:
     return problems
 
 
-def _check_fields(spec: TemplateSpec, block: Sequence[str]) -> list[Problem]:
+def _check_fields(spec: TemplateSpec, section: Sequence[Token]) -> list[Problem]:
     """Check that every template field is present, non-empty and filled."""
-    found = _parse_fields(block)
+    found = _parse_fields(section)
     problems: list[Problem] = []
     for label in spec.fields:
         if label not in found:
@@ -268,6 +326,8 @@ def _check_fields(spec: TemplateSpec, block: Sequence[str]) -> list[Problem]:
 
 def check_body(spec: TemplateSpec, body: str | None) -> list[Problem]:
     """Validate a pull request body against spec and return all problems."""
+    if _PARSER is None:
+        raise RuntimeError(_MISSING_PARSER_ERROR)
     text = body or ""
     if len(text) > MAX_BODY_CHARS:
         return [
@@ -276,22 +336,22 @@ def check_body(spec: TemplateSpec, body: str | None) -> list[Problem]:
                 f"pull request body length {len(text)} exceeds {MAX_BODY_CHARS}",
             )
         ]
-    blocks = _extract_blocks(_clean_text(text))
-    if not blocks:
+    sections = _extract_sections(text)
+    if not sections:
         return [
             Problem(
                 "missing-block",
                 "missing '## Clean-Room Attestation' section",
             )
         ]
-    if len(blocks) > 1:
+    if len(sections) > 1:
         return [
             Problem(
                 "duplicate-block",
                 "'## Clean-Room Attestation' section appears more than once",
             )
         ]
-    return _check_boxes(spec, blocks[0]) + _check_fields(spec, blocks[0])
+    return _check_boxes(spec, sections[0]) + _check_fields(spec, sections[0])
 
 
 def _read_event_body(path: Path) -> str:
@@ -365,10 +425,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.event is not None
             else _read_markdown_body(args.body)
         )
-    except (TypeError, ValueError) as exc:
+        problems = check_body(spec, body)
+    except (RuntimeError, TypeError, ValueError) as exc:
         print(f"attestation: error: {exc}", file=sys.stderr)
         return 2
-    problems = check_body(spec, body)
     if not problems:
         print("attestation: pass")
         return 0

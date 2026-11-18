@@ -96,6 +96,118 @@ NON_LINE_SEPARATORS: tuple[tuple[str, str], ...] = (
 )
 
 
+def _box_indent_pair(spaces: int) -> tuple[str, str]:
+    """Return (old, new) box block strings with non-blank lines indented."""
+    text = (FIXTURES / "pass/complete.md").read_text(encoding="utf-8")
+    old = text[text.index("- [x] While") : text.index("**Inputs used**")]
+    prefix = " " * spaces
+    new = "".join(
+        f"{prefix}{line}" if line.strip() else line
+        for line in old.splitlines(keepends=True)
+    )
+    return old, new
+
+
+_H = "## Clean-Room Attestation"
+_ROLES_ANSWER = (
+    "- No codec or container component touched (CI tooling over pull request text)."
+)
+
+# (case name, old substring in pass/complete.md, replacement, expected codes).
+RENDER_CASES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
+    ("boxes-indent-4", *_box_indent_pair(4), frozenset({"missing-box"})),
+    ("boxes-indent-2", *_box_indent_pair(2), frozenset()),
+    ("boxes-indent-3", *_box_indent_pair(3), frozenset()),
+    (
+        "roles-answer-indent-4",
+        "\n- No codec or container",
+        "\n    - No codec or container",
+        frozenset({"empty-field"}),
+    ),
+    (
+        "roles-answer-tab",
+        "\n- No codec or container",
+        "\n\t- No codec or container",
+        frozenset({"empty-field"}),
+    ),
+    (
+        "first-answer-code-second-real",
+        "\n- CLEANROOM.md, section",
+        "\n    - CLEANROOM.md, section",
+        frozenset(),
+    ),
+    (
+        "comment-splits-heading",
+        _H,
+        "## Clean-Room<!--\n--> Attestation",
+        frozenset({"missing-block"}),
+    ),
+    (
+        "same-line-comments",
+        "source exposure.",
+        "source exposure. <!-- ok -->",
+        frozenset(),
+    ),
+    (
+        "text-after-comment-block",
+        _H,
+        "<!-- x -->" + _H,
+        frozenset({"missing-block"}),
+    ),
+    (
+        "inline-comment-into-heading",
+        "\n" + _H,
+        "\nSee notes.<!--\n-->" + _H,
+        frozenset({"missing-block"}),
+    ),
+    (
+        "unterminated-inline-comment",
+        "\n" + _H,
+        "\nSee notes <!--\n" + _H,
+        frozenset(),
+    ),
+    (
+        "fence-hides-comment",
+        _H + "\n",
+        _H + "\n~~~\n<!--\n~~~\n## Other\n~~~\n-->\n~~~\n",
+        frozenset({"missing-box", "missing-field"}),
+    ),
+    (
+        "setext-h2",
+        _H + "\n",
+        _H + "\n\nOther section\n---\n",
+        frozenset({"missing-box", "missing-field"}),
+    ),
+    (
+        "setext-h1",
+        _H + "\n",
+        _H + "\n\nOther section\n===\n",
+        frozenset({"missing-box", "missing-field"}),
+    ),
+    (
+        "setext-field-label",
+        "component touched):\n",
+        "component touched):\n---\n",
+        frozenset({"missing-field"}),
+    ),
+    ("dash-break-answer", _ROLES_ANSWER, "- - -", frozenset({"empty-field"})),
+    ("star-break-answer", _ROLES_ANSWER, "* * *", frozenset({"empty-field"})),
+    ("list-then-dashes", "source exposure.\n", "source exposure.\n---\n", frozenset()),
+    ("break-after-blank", "\n**Inputs used**", "\n---\n\n**Inputs used**", frozenset()),
+    (
+        "nested-answer",
+        "- docs/plan/milestones.md",
+        "- docs/plan/milestones.md\n  - nested detail",
+        frozenset(),
+    ),
+    (
+        "setext-attestation-heading",
+        _H + "\n",
+        "Clean-Room Attestation\n---\n",
+        frozenset(),
+    ),
+)
+
 # (case name, argv with {tpl}/{tmp}/{fx} slots, expected rc, expected output needle).
 # {tpl} = PR template, {tmp} = per-run temp dir, {fx} = fixture root.
 _ERROR = "attestation: error:"
@@ -284,6 +396,32 @@ def _check_line_separators(spec: Any) -> tuple[int, int]:
     return len(NON_LINE_SEPARATORS), bad
 
 
+def _check_render_cases(spec: Any) -> tuple[int, int]:
+    """Check CommonMark rendering edge cases derived from pass/complete.md."""
+    base = (FIXTURES / "pass/complete.md").read_text(encoding="utf-8")
+    bad = 0
+    for name, old, new, want_codes in RENDER_CASES:
+        body = base.replace(old, new, 1)
+        problems = MOD.check_body(spec, body)
+        got_codes = frozenset(item.code for item in problems)
+        count_ok = (
+            not problems
+            if not want_codes
+            else (
+                len(problems) == 1
+                if want_codes == frozenset({"missing-block"})
+                else len(problems) >= 1
+            )
+        )
+        ok = old in base and got_codes == want_codes and count_ok
+        bad += not _report(
+            f"render/{name}",
+            ok,
+            f"codes={set(got_codes)!r} count={len(problems)}",
+        )
+    return len(RENDER_CASES), bad
+
+
 def _check_placeholder_cases() -> tuple[int, int]:
     """Check unit cases for MOD.is_placeholder including CommonMark autolinks."""
     bad = 0
@@ -362,6 +500,54 @@ def _check_cli_cases(tmp_dir: Path) -> tuple[int, int]:
     return len(CLI_CASES), bad
 
 
+def _check_missing_dep_cli() -> tuple[int, int]:
+    """Verify that running attestation.py without site-packages exits 2."""
+    # nosemgrep: dangerous-subprocess-use-audit  # Fixed python3 argv.
+    proc = subprocess.run(  # nosec B603  # Fixed python3 argv, no shell or untrusted input.
+        [
+            sys.executable,
+            "-I",
+            "-S",
+            "-B",
+            str(SCRIPT),
+            "--template",
+            str(TEMPLATE),
+            "--body",
+            str(FIXTURES / "pass/complete.md"),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    ok = proc.returncode == 2 and "markdown-it-py is not installed" in proc.stderr
+    bad = not _report(
+        "cli/missing-dep",
+        ok,
+        f"rc={proc.returncode} err={proc.stderr!r}",
+    )
+    return 1, int(bad)
+
+
+def _check_workflow() -> tuple[int, int]:
+    """Check that cleanroom.yml fetches the live pull request body via gh api."""
+    workflow = (ROOT / ".github/workflows/cleanroom.yml").read_text(encoding="utf-8")
+    has_api_line = any(
+        "timeout" in line and "gh api" in line and "/pulls/$PR_NUMBER" in line
+        for line in workflow.splitlines()
+    )
+    ok = (
+        "tools/cleanroom/attestation.py" in workflow
+        and "--body" in workflow
+        and "--event" not in workflow
+        and has_api_line
+        and "pull-requests: read" in workflow
+    )
+    bad = not _report("workflow/cleanroom.yml", ok)
+    return 1, int(bad)
+
+
 def main() -> int:
     """Run all attestation completeness tests and exit 1 on any failure."""
     spec = MOD.load_template(TEMPLATE)
@@ -374,9 +560,12 @@ def main() -> int:
             _check_pass_fixtures(spec, tmp_dir),
             _check_fail_fixtures(spec),
             _check_line_separators(spec),
+            _check_render_cases(spec),
             _check_placeholder_cases(),
             _check_boundaries(spec),
             _check_cli_cases(tmp_dir),
+            _check_missing_dep_cli(),
+            _check_workflow(),
         ):
             total_cases += count
             total_bad += bad

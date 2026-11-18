@@ -184,7 +184,9 @@ Check 2 runs as the `Clean-room attestation` job of
 ([tools/cleanroom/attestation.py](tools/cleanroom/attestation.py), fixtures
 under
 [tools/cleanroom/fixtures/attestation/](tools/cleanroom/fixtures/attestation/))
-and reruns whenever a pull request's description is edited.
+and reruns whenever a pull request's description is edited, reading the current
+description through the API on each run so a rerun checks the description as it
+stands.
 [.github/rulesets/main.json](.github/rulesets/main.json) lists it among the
 required status checks, and the ruleset on the forge takes the same list once
 planted pull requests have shown the check fails there (criterion 2 of

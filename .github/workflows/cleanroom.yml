@@ -7,9 +7,9 @@
 # description is edited (`edited`) as well as on commits and state transitions.
 # Uses `pull_request`, never `pull_request_target`, because GitHub blocks
 # `pull_request_target` by default in public repositories from 2026-12-02
-# (GitHub Changelog, 2026-11-02). The pull request body is read directly from
-# the event payload file (`$GITHUB_EVENT_PATH`), never interpolated into a
-# shell line.
+# (GitHub Changelog, 2026-11-02). The pull request body is fetched from the
+# GitHub API on each run into `$RUNNER_TEMP/body.md`, so reruns check the live
+# description and never interpolate it into a shell line.
 name: Clean-room
 
 'on':
@@ -32,6 +32,9 @@ jobs:
     name: Clean-room attestation
     runs-on: ubuntu-26.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Stop on a draft pull request
         if: github.event.pull_request.draft == true
@@ -50,13 +53,29 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+      - name: Install the clean-room tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cleanroom"
+          timeout 180 "$RUNNER_TEMP/cleanroom/bin/python" -m pip install \
+            --require-hashes --only-binary=:all: --timeout=30 \
+            -r tools/cleanroom/requirements.txt
       - name: Test the attestation check
         run: |
-          python3 -I -B tools/cleanroom/test_attestation.py .
+          "$RUNNER_TEMP/cleanroom/bin/python" -I -B \
+            tools/cleanroom/test_attestation.py .
+      - name: Fetch the pull request body
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          timeout 60 gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '.body // ""' > "$RUNNER_TEMP/body.md"
       - name: Check the attestation
         if: github.event_name == 'pull_request'
         run: |
-          python3 -I -B tools/cleanroom/attestation.py \
+          "$RUNNER_TEMP/cleanroom/bin/python" -I -B \
+            tools/cleanroom/attestation.py \
             --template .github/pull_request_template.md \
-            --event "$GITHUB_EVENT_PATH" \
+            --body "$RUNNER_TEMP/body.md" \
             --annotations
