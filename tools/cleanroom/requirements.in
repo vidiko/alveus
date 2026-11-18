@@ -4,7 +4,6 @@
 # Direct dependencies of the clean-room tools, one exact pin each. requirements.txt is
 # the lock compiled from this file: every package the tools install, pinned with hashes.
 # Change a pin here, then regenerate the lock from this directory with the command
-# recorded in the requirements.txt header (Renovate runs the same command). Keep '='
-# between each option and its argument: Renovate skips a lock whose header separates them
-# with a space or uses a short option, and CI rejects such a header.
+# recorded in the requirements.txt header. Keep '=' between each option and its argument
+# as docs/requirements.txt does.
 markdown-it-py==4.3.0

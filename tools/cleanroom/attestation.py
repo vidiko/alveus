@@ -9,10 +9,11 @@ a pull request body contains that section once, checks every required box, and
 provides non-empty, non-placeholder list items for every required field.
 
 The module-level constant ``PLACEHOLDERS`` holds the lowercase word and phrase
-tokens rejected as placeholder list items (in addition to empty items,
-punctuation-only items, and angle-bracketed ``<...>`` placeholders). The
-answers ``none`` and ``None.`` are valid disclosures and are not in
-``PLACEHOLDERS``.
+tokens rejected as placeholder list items (in addition to empty items and
+punctuation-only items). Placeholder checks run on the visible text, i.e. the
+item with every ``<...>`` tag removed unless the whole item is a URI or email
+autolink. The answers ``none`` and ``None.`` are valid disclosures and are not
+in ``PLACEHOLDERS``.
 """
 
 from __future__ import annotations
@@ -57,6 +58,8 @@ PLACEHOLDERS: frozenset[str] = frozenset(
 )
 
 _BOX_MARKER_RE = re.compile(r"^\[([ xX])\](?:\s|$)")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_HTML_TAG_RE = re.compile(r"<[^<>]*>")
 _URI_AUTOLINK_RE = re.compile(r"^<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>$")
 _EMAIL_AUTOLINK_RE = re.compile(
     r"^<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9]"
@@ -84,15 +87,12 @@ class Problem:
 def is_placeholder(item: str) -> bool:
     """Return whether a list item's text is empty or a placeholder."""
     text = " ".join(item.split())
+    if _URI_AUTOLINK_RE.match(text) is None and _EMAIL_AUTOLINK_RE.match(text) is None:
+        text = " ".join(_HTML_TAG_RE.sub("", text).split())
     if not text:
         return True
     if all(ch in "-.…?" for ch in text):
         return True
-    if text.startswith("<") and text.endswith(">"):
-        return (
-            _URI_AUTOLINK_RE.match(text) is None
-            and _EMAIL_AUTOLINK_RE.match(text) is None
-        )
     lowered = text.casefold()
     return lowered in PLACEHOLDERS or lowered.rstrip(".:") in PLACEHOLDERS
 
@@ -222,7 +222,7 @@ def _collect_answer_token(
     elif token.type == "list_item_close":
         _, slot, parts = item_stack.pop()
         if parts is not None:
-            current_items[slot] = " ".join(part for part in parts if part)
+            current_items[slot] = " ".join(" ".join(parts).split())
     elif (
         token.type == "paragraph_open"
         and item_stack
@@ -232,6 +232,13 @@ def _collect_answer_token(
         and tokens[index + 1].type == "inline"
     ):
         item_stack[-1][2].append(_render_inline(tokens[index + 1]))
+    elif (
+        token.type == "html_block"
+        and item_stack
+        and item_stack[-1][2] is not None
+        and token.level == item_stack[-1][0] + 1
+    ):
+        item_stack[-1][2].append(_HTML_COMMENT_RE.sub("", token.content))
 
 
 def _parse_fields(tokens: Sequence[Token]) -> dict[str, list[str]]:

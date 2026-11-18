@@ -112,6 +112,12 @@ _H = "## Clean-Room Attestation"
 _ROLES_ANSWER = (
     "- No codec or container component touched (CI tooling over pull request text)."
 )
+_EXPOSURE_ANSWER = (
+    "- Read RFC 9043 and RFC 9559 in prior specification review; no FFmpeg or libav\n"
+    "  source exposure."
+)
+_REQ_COMMENT = "<!-- Required for every pull request. See CLEANROOM.md. -->\n"
+_EXPOSURE_LABEL = '**Past exposure to disclose** (or "none"):'
 
 # (case name, old substring in pass/complete.md, replacement, expected codes).
 RENDER_CASES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
@@ -205,6 +211,172 @@ RENDER_CASES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         _H + "\n",
         "Clean-Room Attestation\n---\n",
         frozenset(),
+    ),
+    (
+        "comment-then-answer",
+        _ROLES_ANSWER,
+        "- <!-- note --> No codec or container component touched.",
+        frozenset(),
+    ),
+    (
+        "comment-then-placeholder",
+        _ROLES_ANSWER,
+        "- <!-- note --> TBD",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "inline-html-answer",
+        _ROLES_ANSWER,
+        "- No codec <kbd>component</kbd> touched.",
+        frozenset(),
+    ),
+    (
+        "comment-only-inline",
+        _ROLES_ANSWER,
+        "- <!-- fill --> <!-- more -->",
+        frozenset({"empty-field"}),
+    ),
+    ("quoted-heading", _H + "\n", "> " + _H + "\n", frozenset({"missing-block"})),
+    (
+        "h3-inside-section",
+        "\n**Inputs used**",
+        "\n### Notes\n\n**Inputs used**",
+        frozenset(),
+    ),
+    ("box-no-space", "- [x] While", "- [x]While", frozenset({"missing-box"})),
+    (
+        "nested-box",
+        "- [x] Every input",
+        "  - [x] Every input",
+        frozenset({"missing-box"}),
+    ),
+    ("note-under-box", "source trees).\n", "source trees).\n  - note\n", frozenset()),
+    (
+        "field-before-boxes",
+        _REQ_COMMENT,
+        _REQ_COMMENT
+        + "\n**Inputs used** (document and clause, spec note, or measurement):\n\n"
+        "- early answer.\n",
+        frozenset({"missing-box"}),
+    ),
+    (
+        "ordered-answer",
+        _ROLES_ANSWER,
+        "1. " + _ROLES_ANSWER[2:],
+        frozenset({"empty-field"}),
+    ),
+    (
+        "bullet-in-ordered",
+        _ROLES_ANSWER,
+        "1. Roles:\n   " + _ROLES_ANSWER,
+        frozenset({"empty-field"}),
+    ),
+    (
+        "quoted-list-answer",
+        _ROLES_ANSWER,
+        "> " + _ROLES_ANSWER,
+        frozenset({"empty-field"}),
+    ),
+    (
+        "quote-in-answer-item",
+        _ROLES_ANSWER,
+        "- > " + _ROLES_ANSWER[2:],
+        frozenset({"empty-field"}),
+    ),
+    ("code-span-answer", _EXPOSURE_ANSWER, "- `none`", frozenset()),
+    (
+        "hardbreak-in-box",
+        "translate FFmpeg\n  or libav",
+        "translate FFmpeg\\\n  or libav",
+        frozenset(),
+    ),
+    ("em-label", "**Roles**", "*Roles*", frozenset({"missing-field"})),
+    (
+        "table-label",
+        _EXPOSURE_LABEL,
+        _EXPOSURE_LABEL + " | x\n--- | ---",
+        frozenset({"missing-field"}),
+    ),
+    (
+        "comment-block-then-paragraph",
+        _ROLES_ANSWER,
+        "- <!-- c -->\n\n  No codec or container component touched.",
+        frozenset(),
+    ),
+    (
+        "comments-around-answer",
+        _ROLES_ANSWER,
+        "- <!-- a --> No codec or container component touched. <!-- b -->",
+        frozenset(),
+    ),
+    (
+        "quoted-html-in-item",
+        _ROLES_ANSWER,
+        "- > <!-- c --> No codec or container component touched.",
+        frozenset({"empty-field"}),
+    ),
+    (
+        "span-answer",
+        _ROLES_ANSWER,
+        "- <span>No codec or container component touched.</span>",
+        frozenset(),
+    ),
+    (
+        "kbd-placeholder",
+        _ROLES_ANSWER,
+        "- <kbd>TBD</kbd>.",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "div-answer",
+        _ROLES_ANSWER,
+        "- <div>No codec or container component touched.</div>",
+        frozenset(),
+    ),
+    (
+        "div-placeholder",
+        _ROLES_ANSWER,
+        "- <div>TBD</div>",
+        frozenset({"placeholder-field"}),
+    ),
+    ("br-answer", _ROLES_ANSWER, "- <br>", frozenset({"placeholder-field"})),
+    (
+        "div-empty-then-placeholder",
+        _ROLES_ANSWER,
+        "- <div></div> TBD",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "escaped-angle-placeholder",
+        _ROLES_ANSWER,
+        "- TBD \\<x>",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "escaped-angle-answer",
+        _ROLES_ANSWER,
+        "- No codec touched; the check reads \\<pre> text.",
+        frozenset(),
+    ),
+    (
+        "escaped-autolink-answer",
+        _ROLES_ANSWER,
+        "- \\<https://example.org>",
+        frozenset(),
+    ),
+    (
+        "span-heading",
+        _H + "\n",
+        "## <span>Clean-Room Attestation</span>\n",
+        frozenset(),
+    ),
+    ("span-label", "**Roles**", "**<span>Roles</span>**", frozenset()),
+    ("span-box", "- [x] While", "- [x] <span>While</span>", frozenset()),
+    (
+        "span-heading-other",
+        _H + "\n",
+        "## <span>Clean-Room</span> Notes\n",
+        frozenset({"missing-block"}),
     ),
 )
 

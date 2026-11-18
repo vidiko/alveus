@@ -173,8 +173,10 @@ Three checks cover it, and each catches a different failure:
    ([ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)).
 2. The attestation check: a mechanical check that fails a pull request whose
    attestation block is missing, has an unchecked box, or has an empty or
-   placeholder field. It checks that the attestation is complete, not that
-   it is true.
+   placeholder field. An answer is an item of a bullet list (`-`, `*` or `+`)
+   under the field label; text outside such a list, numbered lists and quoted
+   lists do not count, and HTML comments are ignored. It checks that the
+   attestation is complete, not that it is true.
 3. The provenance scan: a licence and copyright scanner run over every
    changed file, which fails on a notice that names FFmpeg, libav or another
    forbidden source. It catches copied code that kept its notices.
