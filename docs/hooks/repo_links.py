@@ -2,112 +2,184 @@
 # SPDX-License-Identifier: EUPL-1.2
 """MkDocs hook that rewrites relative links leaving docs/ to repository URLs.
 
-A page such as docs/index.md may link ../CLEANROOM.md. MkDocs cannot serve that
-file, so the hook points the link at the file on the forge instead. Links inside
-code spans and fenced code blocks stay as written. A link leaving docs/ whose
-target does not exist is logged as a warning, which fails a strict build.
+In on_config, the hook reads the repository's tracked files with git ls-files -z
+and registers a Python-Markdown treeprocessor at priority 15 (after inline link
+parsing at priority 20, before MkDocs' relative-path validator at priority 0).
+In on_page_markdown, the hook records the active page URI on the extension. The
+treeprocessor rewrites anchor hrefs that leave docs/ to forge blob or tree URLs
+when the target is tracked, and logs a warning otherwise so a strict build fails.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-import re
-from pathlib import Path
+import posixpath
+import subprocess
+import urllib.parse
+from collections.abc import Iterable, Mapping
+from pathlib import Path, PurePosixPath
 from typing import Any
+from xml.etree.ElementTree import Element
+
+from markdown import Markdown
+from markdown.extensions import Extension
+from markdown.treeprocessors import Treeprocessor
+from mkdocs.exceptions import PluginError
 
 _LOG = logging.getLogger("mkdocs.hooks.repo_links")
-# A code span (kept as is) or an inline link that is not an image.
-_TOKEN_RE = re.compile(
-    r"(?P<code>(?P<ticks>`+)[^`]*?(?P=ticks))"
-    r"|(?<!!)(?P<label>\[[^\[\]\n]+\])\((?P<target>[^()\s]+)\)"
-)
-_FENCE_RE = re.compile(r"^ {0,3}(?P<fence>`{3,}|~{3,})")
-_SKIP_PREFIXES = ("http://", "https://", "mailto:", "tel:", "/", "#")
 
 
-def _blob_base(config: Any) -> str:
-    """Return <repo_url>/blob/<branch>, the branch taken from edit_uri."""
+def _forge_ref(config: Mapping[str, Any]) -> tuple[str, str]:
+    """Return (<repo_url>, <branch>) from config, defaulting branch to HEAD."""
     repo_url = str(config.get("repo_url") or "").rstrip("/")
     edit_uri = str(config.get("edit_uri") or "").strip("/")
     parts = edit_uri.split("/")
     branch = parts[1] if len(parts) > 1 and parts[0] in ("edit", "blob") else "HEAD"
-    return f"{repo_url}/blob/{branch}"
+    return repo_url, branch
 
 
-def _rewrite_target(raw_target: str, page: dict[str, Any]) -> str:
-    """Resolve one link target and rewrite it when it leaves docs/."""
-    if raw_target.startswith(_SKIP_PREFIXES) or "://" in raw_target:
-        return raw_target
-    target_path, sep, anchor = raw_target.partition("#")
-    if not target_path:
-        return raw_target
-    resolved = Path(os.path.normpath(page["dir"] / target_path))
-    if resolved.is_relative_to(page["docs_dir"]):
-        return raw_target
-    repo_root = page["docs_dir"].parent
-    if resolved.is_relative_to(repo_root) and resolved.exists():
-        rel_repo = resolved.relative_to(repo_root).as_posix()
-        fragment = f"#{anchor}" if sep else ""
-        return f"{page['blob_base']}/{rel_repo}{fragment}"
-    _LOG.warning(
-        "Doc file '%s' contains a link '%s' outside docs/, but target does not exist.",
-        page["src_uri"],
-        raw_target,
-    )
-    return raw_target
+def _tracked_files(repo_root: Path) -> frozenset[str]:
+    """Return the repository's tracked file paths from git ls-files -z."""
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=repo_root,
+            capture_output=True,
+            timeout=30,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        stderr = getattr(exc, "stderr", b"") or b""
+        cause = stderr.decode("utf-8", errors="replace").strip() or str(exc)
+        raise PluginError(
+            f"repo_links: git ls-files failed in {repo_root}: {cause}"
+        ) from exc
+    output = proc.stdout.decode("utf-8", errors="surrogateescape")
+    return frozenset(entry for entry in output.split("\0") if entry)
 
 
-def _closes(line: str, fence: str) -> bool:
-    """Return whether line closes a fenced block opened with fence."""
-    closer = _FENCE_RE.match(line)
-    if closer is None:
-        return False
-    run = closer.group("fence")
-    same_kind = run[0] == fence[0] and len(run) >= len(fence)
-    return same_kind and not line.strip().strip(run[0])
+class _RepoLinksTreeprocessor(Treeprocessor):
+    """Treeprocessor that rewrites relative anchor hrefs leaving docs/."""
+
+    def __init__(self, md: Markdown, ext: RepoLinksExtension) -> None:
+        """Bind the treeprocessor to its Markdown instance and extension."""
+        super().__init__(md)
+        self._ext = ext
+
+    def run(self, root: Element) -> Element:
+        """Rewrite every anchor href in the parsed element tree."""
+        for anchor in root.iter("a"):
+            href = anchor.get("href")
+            if href is not None:
+                anchor.set("href", self._ext.rewrite_href(href))
+        return root
 
 
-def _rewrite_prose(text: str, page: dict[str, Any]) -> str:
-    """Rewrite inline links in prose, leaving code spans untouched."""
+class RepoLinksExtension(Extension):
+    """Python-Markdown extension that registers the repository link rewriter."""
 
-    def _replace(match: re.Match[str]) -> str:
-        if match.group("code") is not None:
-            return match.group(0)
-        target = _rewrite_target(match.group("target"), page)
-        return f"{match.group('label')}({target})"
+    def __init__(
+        self,
+        config: Mapping[str, Any],
+        tracked: Iterable[str],
+        docs_rel: str = "docs",
+        src_uri: str = "index.md",
+    ) -> None:
+        """Derive the forge URLs from config and index the tracked paths."""
+        super().__init__()
+        repo_url, branch = _forge_ref(config)
+        self._blob_base = f"{repo_url}/blob/{branch}"
+        self._tree_base = f"{repo_url}/tree/{branch}"
+        self._tracked_files = frozenset(tracked)
+        self._tracked_dirs = frozenset(
+            parent.as_posix()
+            for item in self._tracked_files
+            for parent in PurePosixPath(item).parents
+            if parent.as_posix() != "."
+        )
+        self.docs_rel = docs_rel
+        self.src_uri = src_uri
 
-    return _TOKEN_RE.sub(_replace, text)
+    def set_page(self, src_uri: str) -> None:
+        """Record the docs-relative URI of the page about to be rendered."""
+        self.src_uri = src_uri.replace("\\", "/")
+
+    def rewrite_href(self, href: str) -> str:
+        """Rewrite one anchor href when it leaves docs/ for a tracked path."""
+        parts = urllib.parse.urlsplit(href)
+        if (
+            parts.scheme
+            or parts.netloc
+            or not parts.path
+            or href.startswith(("/", "\\"))
+            or parts.path.startswith(("/", "\\"))
+        ):
+            return href
+        page_dir = posixpath.dirname(self.src_uri)
+        unquoted = urllib.parse.unquote(parts.path)
+        rel_docs = posixpath.normpath(posixpath.join(page_dir, unquoted))
+        if not rel_docs.startswith("../"):
+            return href
+        repo_path = posixpath.normpath(posixpath.join(self.docs_rel, rel_docs))
+        if repo_path == ".." or repo_path.startswith("../"):
+            return href
+        if repo_path in self._tracked_files:
+            base = self._blob_base
+        elif repo_path in self._tracked_dirs:
+            base = self._tree_base
+        else:
+            _LOG.warning(
+                "Doc file '%s' contains a link '%s' outside docs/, "
+                "but '%s' is not a tracked repository path.",
+                self.src_uri,
+                href,
+                repo_path,
+            )
+            return href
+        quoted = urllib.parse.quote(repo_path)
+        query = f"?{parts.query}" if parts.query else ""
+        fragment = f"#{parts.fragment}" if parts.fragment else ""
+        return f"{base}/{quoted}{query}{fragment}"
+
+    def extendMarkdown(self, md: Markdown) -> None:  # noqa: N802
+        """Register the link-rewriting treeprocessor at priority 15."""
+        md.treeprocessors.register(_RepoLinksTreeprocessor(md, self), "repo_links", 15)
+
+
+def on_config(config: Any) -> Any:
+    """Compute tracked repository paths and append RepoLinksExtension."""
+    cfg_path = getattr(config, "config_file_path", None) or config["config_file_path"]
+    config_file = Path(os.path.abspath(str(cfg_path)))
+    repo_root = config_file.parent
+    docs_path = getattr(config, "docs_dir", None) or config["docs_dir"]
+    docs_dir = Path(os.path.abspath(str(docs_path)))
+    try:
+        docs_rel = docs_dir.relative_to(repo_root).as_posix()
+    except ValueError as exc:
+        raise PluginError(
+            f"repo_links: docs_dir {docs_dir} is outside {repo_root}"
+        ) from exc
+    tracked = _tracked_files(repo_root)
+    ext = RepoLinksExtension(config, tracked, docs_rel=docs_rel)
+    extensions = getattr(config, "markdown_extensions", None)
+    if extensions is None:
+        extensions = config["markdown_extensions"]
+    extensions[:] = [
+        item for item in extensions if not isinstance(item, RepoLinksExtension)
+    ]
+    extensions.append(ext)
+    return config
 
 
 def on_page_markdown(markdown: str, page: Any, config: Any, files: Any) -> str:
-    """Rewrite relative Markdown links that leave docs/ to forge blob URLs."""
+    """Tell RepoLinksExtension the current page before rendering."""
     del files
-    docs_dir = Path(os.path.abspath(str(config["docs_dir"])))
-    src_uri = str(
-        getattr(page.file, "src_uri", None) or page.file.src_path
-    ).replace("\\", "/")
-    context = {
-        "docs_dir": docs_dir,
-        "dir": Path(os.path.normpath(docs_dir / src_uri)).parent,
-        "src_uri": src_uri,
-        "blob_base": _blob_base(config),
-    }
-    out: list[str] = []
-    prose: list[str] = []
-    fence = ""
-    for line in markdown.splitlines(keepends=True):
-        opener = _FENCE_RE.match(line)
-        if not fence and opener:
-            out.append(_rewrite_prose("".join(prose), context))
-            prose = []
-            fence = opener.group("fence")
-            out.append(line)
-        elif fence:
-            out.append(line)
-            if _closes(line, fence):
-                fence = ""
-        else:
-            prose.append(line)
-    out.append(_rewrite_prose("".join(prose), context))
-    return "".join(out)
+    src_uri = str(getattr(page.file, "src_uri", None) or page.file.src_path)
+    extensions = getattr(config, "markdown_extensions", None)
+    if extensions is None:
+        extensions = config.get("markdown_extensions", ())
+    for item in extensions:
+        if isinstance(item, RepoLinksExtension):
+            item.set_page(src_uri)
+    return markdown

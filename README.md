@@ -43,14 +43,15 @@ code yet. The plan is in [docs/plan/](docs/plan/README.md). Milestone M0 sets
 up the workspace and the gates, and the first media milestone, M1, is Matroska
 demuxing with FFV1 decoding ([milestones](docs/plan/milestones.md)).
 
-*alveus* (written in lower case: alveus) is a Latin noun meaning a hollow or
-cavity, and from that a trough, the hull of a ship, and the bed or channel of
-a river — a river-channel sense that fits a framework that streams flow
-through. It derives from Latin *alvus*, "belly", and English keeps the word as
-a rare legal term for a river's bed or channel (source:
+*alveus* is a Latin noun meaning a hollow or cavity, and from that a trough,
+the hull of a ship, and the bed or channel of a river — a river-channel sense
+that fits a framework that streams flow through. It derives from Latin
+*alvus*, "belly", and English keeps the word as a rare legal term for a
+river's bed or channel (source:
 [Wiktionary, "alveus"](https://en.wiktionary.org/wiki/alveus)). Pronunciation
 is **AL-weh-us** (with the last vowel as in English *put*; IPA [ˈaɫ.we.ʊs]) in
-Classical Latin and **AL-vee-us** (IPA /ˈæl.vi.əs/) in English.
+Classical Latin and **AL-vee-us** (IPA /ˈæl.vi.əs/) in English. The name is
+always written in lower case ([docs/index.md](docs/index.md)).
 
 **[📖 Documentation](https://vidiko.github.io/alveus/)** · [Documentation source](docs/)
 
@@ -65,7 +66,7 @@ crates and verifiable conformance ([docs/plan/README.md](docs/plan/README.md)).
 | :--- | :--- |
 | Clean-room provenance | Contributors work from public specifications and from black-box measurements that a separate spec writer records, with an attestation on every pull request ([CLEANROOM.md](CLEANROOM.md)). |
 | One crate per component | The planned Cargo workspace gives each container, codec and shared concern its own `alveus-<name>` crate so callers link only what they need ([docs/plan/architecture.md](docs/plan/architecture.md)). |
-| Verifiable exit criteria | Media milestones close on an exact oracle (bit-exact frames, a conformance stream set or a stored checksum) and on fuzz targets that run for one CPU hour without a crash or hang ([docs/plan/milestones.md](docs/plan/milestones.md)). |
+| Verifiable exit criteria | Media milestones close on an exact oracle (bit-exact frames, a conformance stream set or a stored checksum), and only those that add a demuxer or decoder (M1, M3, M5, M6 and M7) also close on fuzz targets that run for one CPU hour without a crash or hang ([docs/plan/milestones.md](docs/plan/milestones.md)). |
 | High-integrity Rust | All planned code follows the HISS-21 rules: no recursion, bounded loops, explicit I/O deadlines, no allocation in hot loops, typed errors, and `unsafe` only in SIMD modules and the C interface, each block with a `// SAFETY:` proof ([AGENTS.md](AGENTS.md), [docs/plan/architecture.md](docs/plan/architecture.md)). |
 | Licensing and REUSE | The repository is licensed under EUPL-1.2 ([LICENSE](LICENSE)), with per-file copyright and licence metadata checked by `reuse lint` ([REUSE.toml](REUSE.toml)). |
 
@@ -78,7 +79,8 @@ the plan and verify the repository locally:
 1. Read the [milestone ladder](docs/plan/milestones.md) and the
    [scope matrix](docs/plan/scope-matrix.md) to see what is planned and in
    which order.
-2. Clone the repository and run the repository gate ([Makefile](Makefile)):
+2. Clone the repository and run the repository gate, which requires
+   `praetorctl` and `gitleaks` 8.30.1 on `PATH` ([Makefile](Makefile)):
 
    ```bash
    git clone https://github.com/vidiko/alveus.git
@@ -198,11 +200,14 @@ flowchart TD
 ## Upstream and licence
 
 alveus has no upstream code base: it is written clean-room from public
-specifications under [CLEANROOM.md](CLEANROOM.md). For milestones M1 to M7
-the [scope matrix](docs/plan/scope-matrix.md) names RFC 8794 (EBML), RFC 9559
-(Matroska), RFC 9043 (FFV1), RFC 9639 (FLAC), RFC 3533 (Ogg), RFC 6716 (Opus),
-the AOMedia AV1 Bitstream and Decoding Process Specification, and ISO/IEC
-14496-12 (ISO base media file format); it lists every planned specification.
+specifications under [CLEANROOM.md](CLEANROOM.md). The
+[scope matrix](docs/plan/scope-matrix.md) lists every planned specification;
+among those for milestones M1 to M7 are RFC 8794 (EBML), RFC 9559 (Matroska)
+and the Matroska codec mappings (`draft-ietf-cellar-codec`), RFC 9043 (FFV1),
+RFC 9639 (FLAC), RFC 3533 (Ogg), RFC 6716 (Opus) and RFC 7845 (Opus in Ogg),
+the AOMedia AV1 Bitstream and Decoding Process Specification, ISO/IEC 14496-12
+(ISO base media file format) and the AOMedia AV1 Codec ISO Media File
+Format Binding.
 
 alveus is licensed under the European Union Public Licence 1.2
 ([LICENSE](LICENSE)). Licence and copyright information for every file

@@ -5,48 +5,152 @@
 Run from the repository root: python3 -I -B docs/hooks/test_repo_links.py .
 """
 
+from __future__ import annotations
+
 import importlib.util
+import logging
 import sys
 import types
+import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any
+
+import markdown
 
 ROOT = Path(sys.argv[1]).resolve()
-SPEC = importlib.util.spec_from_file_location("repo_links", ROOT / "docs/hooks/repo_links.py")
+SPEC = importlib.util.spec_from_file_location(
+    "repo_links", ROOT / "docs/hooks/repo_links.py"
+)
+if SPEC is None or SPEC.loader is None:
+    raise RuntimeError("Failed to load docs/hooks/repo_links.py")
 MOD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MOD)
-CFG = {
-    "docs_dir": str(ROOT / "docs"),
+
+CFG: dict[str, Any] = {
     "repo_url": "https://github.com/vidiko/alveus",
     "edit_uri": "edit/main/docs/",
 }
-PAGE = types.SimpleNamespace(file=types.SimpleNamespace(src_uri="index.md", src_path="index.md"))
+TRACKED = frozenset(
+    {
+        "CLEANROOM.md",
+        "LICENSE",
+        "docs/index.md",
+        "docs/plan/README.md",
+        "lua/alveus.lua",
+    }
+)
 B = "https://github.com/vidiko/alveus/blob/main/"
-CASES = [
-    (CFG, "[a](../CLEANROOM.md)", f"[a]({B}CLEANROOM.md)"),
-    (CFG, "[a](../CLEANROOM.md#roles)", f"[a]({B}CLEANROOM.md#roles)"),
-    (CFG, "[a](plan/README.md)", "[a](plan/README.md)"),
-    (CFG, "![i](../CLEANROOM.md)", "![i](../CLEANROOM.md)"),
-    (CFG, "`[a](../CLEANROOM.md)`", "`[a](../CLEANROOM.md)`"),
-    (CFG, "``x `[a](../CLEANROOM.md)` y``", "``x `[a](../CLEANROOM.md)` y``"),
-    (CFG, "```md\n[a](../CLEANROOM.md)\n```\n[b](../CLEANROOM.md)",
-     f"```md\n[a](../CLEANROOM.md)\n```\n[b]({B}CLEANROOM.md)"),
-    (CFG, "~~~~\n[a](../CLEANROOM.md)\n~~~\nstill\n~~~~\n[b](../LICENSE)",
-     f"~~~~\n[a](../CLEANROOM.md)\n~~~\nstill\n~~~~\n[b]({B}LICENSE)"),
-    (CFG, "[a](https://example.org/x)", "[a](https://example.org/x)"),
-    (CFG, "[a](#here)", "[a](#here)"),
-    (CFG, "[a](../NO-SUCH.md)", "[a](../NO-SUCH.md)"),
-    (dict(CFG, edit_uri=""), "[a](../LICENSE)",
-     "[a](https://github.com/vidiko/alveus/blob/HEAD/LICENSE)"),
+T = "https://github.com/vidiko/alveus/tree/main/"
+H = "https://github.com/vidiko/alveus/blob/HEAD/"
+
+# Each entry: (page_uri, edit_uri, markdown_src, expected_hrefs, expected_srcs, warnings)
+CASES: list[tuple[str, str, str, list[str], list[str], int]] = [
+    ("index.md", "edit/main/docs/", "[a](../CLEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../CLEANROOM.md#anchor)", [f"{B}CLEANROOM.md#anchor"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../CLEANROOM.md?plain=1#x)", [f"{B}CLEANROOM.md?plain=1#x"], [], 0),
+    ("index.md", "edit/main/docs/", '[a](../CLEANROOM.md "t")', [f"{B}CLEANROOM.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](<../CLEANROOM.md>)", [f"{B}CLEANROOM.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[b][r]\n\n[r]: ../CLEANROOM.md", [f"{B}CLEANROOM.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[first\nsecond](../CLEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[![b](assets/x.svg)](../CLEANROOM.md)",
+        [f"{B}CLEANROOM.md"],
+        ["assets/x.svg"],
+        0,
+    ),
+    ("index.md", "edit/main/docs/", "`[a](../CLEANROOM.md)`", [], [], 0),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "first ` paragraph\n\n[a](../CLEANROOM.md)\n\nsecond ` paragraph",
+        [f"{B}CLEANROOM.md"],
+        [],
+        0,
+    ),
+    ("index.md", "edit/main/docs/", "```md\n[a](../CLEANROOM.md)\n```", [], [], 0),
+    ("index.md", "edit/main/docs/", "~~~\n[a](../CLEANROOM.md)\n~~~", [], [], 0),
+    ("index.md", "edit/main/docs/", "- item\n\n  ```\n  [a](../CLEANROOM.md)\n  ```", [], [], 0),
+    ("index.md", "edit/main/docs/", "    [a](../CLEANROOM.md)", [], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../lua/)", [f"{T}lua"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../%43LEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../SECURITY.md)", ["../SECURITY.md"], [], 1),
+    ("index.md", "edit/main/docs/", "[a](../NO-SUCH.md)", ["../NO-SUCH.md"], [], 1),
+    ("index.md", "edit/main/docs/", "[a](https://example.org/x)", ["https://example.org/x"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](#anchor)", ["#anchor"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](plan/README.md)", ["plan/README.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../../x.md)", ["../../x.md"], [], 0),
+    ("plan/README.md", "edit/main/docs/", "[a](../../CLEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
+    ("index.md", "", "[a](../CLEANROOM.md)", [f"{H}CLEANROOM.md"], [], 0),
 ]
 
 
+class _ListHandler(logging.Handler):
+    """Capture warning records emitted by the hook logger during a test case."""
+
+    def __init__(self) -> None:
+        """Start with no captured messages at warning level."""
+        super().__init__(level=logging.WARNING)
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Store the formatted message of one log record."""
+        self.messages.append(record.getMessage())
+
+
+def _run_case(
+    page_uri: str,
+    edit_uri: str,
+    src: str,
+    want_hrefs: list[str],
+    want_srcs: list[str],
+    want_warns: int,
+) -> bool:
+    """Render one Markdown snippet through the hook extension and check output."""
+    cfg: dict[str, Any] = dict(CFG, edit_uri=edit_uri)
+    ext = MOD.RepoLinksExtension(cfg, TRACKED)
+    cfg["markdown_extensions"] = [ext]
+    page = types.SimpleNamespace(
+        file=types.SimpleNamespace(src_uri=page_uri, src_path=page_uri)
+    )
+    logger = logging.getLogger("mkdocs.hooks.repo_links")
+    handler = _ListHandler()
+    logger.addHandler(handler)
+    try:
+        md_input = MOD.on_page_markdown(src, page, cfg, None)
+        # mkdocs.yml loads pymdownx.superfences ahead of the hook; match it.
+        md = markdown.Markdown(extensions=["pymdownx.superfences", ext])
+        html = md.convert(md_input)
+    finally:
+        logger.removeHandler(handler)
+    root = ET.fromstring(f"<root>{html}</root>")
+    got_hrefs = [a.get("href", "") for a in root.iter("a")]
+    got_srcs = [img.get("src", "") for img in root.iter("img")]
+    got_codes = ["".join(code.itertext()).strip() for code in root.iter("code")]
+    code_ok = True if want_hrefs else got_codes == ["[a](../CLEANROOM.md)"]
+    ok = (
+        got_hrefs == want_hrefs
+        and got_srcs == want_srcs
+        and len(handler.messages) == want_warns
+        and code_ok
+    )
+    status = "ok  " if ok else "FAIL"
+    detail = (
+        ""
+        if ok
+        else f"-> hrefs={got_hrefs!r} srcs={got_srcs!r} warns={len(handler.messages)}"
+    )
+    print(status, repr(src), detail)
+    return ok
+
+
 def main() -> int:
+    """Run all 24 link-rewriting cases and exit 1 on any failure."""
     bad = 0
-    for cfg, src, want in CASES:
-        got = MOD.on_page_markdown(src, PAGE, cfg, None)
-        ok = got == want
-        bad += 0 if ok else 1
-        print("ok  " if ok else "FAIL", repr(src), "" if ok else f"-> {got!r}")
+    for page_uri, edit_uri, src, want_hrefs, want_srcs, want_warns in CASES:
+        if not _run_case(page_uri, edit_uri, src, want_hrefs, want_srcs, want_warns):
+            bad += 1
     print(f"cases={len(CASES)} failed={bad}")
     return 1 if bad else 0
 
