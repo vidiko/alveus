@@ -136,5 +136,6 @@ carries over:
 | **L2** | A corpus of real command lines, each with its expected result, accepted and checked by black-box comparison. | P3 |
 | **L3** | Drop-in replacement, including filter-graph syntax and identical output. | X |
 
-Level L1 waits for the command-line naming question in
-[CLEANROOM.md](../../CLEANROOM.md#open-questions).
+Level L1 option names come from black-box observation by the spec writer, help
+output included
+([ADR-0002](../adr/0002-command-line-names-from-observation.md)).

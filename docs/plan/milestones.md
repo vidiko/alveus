@@ -170,12 +170,14 @@ contract is a follow-up page listed in [README.md](README.md).
 
 ## M5: Ogg demux and Opus decode
 
-**Blocked by** the open question on normative reference code in
-[CLEANROOM.md](../../CLEANROOM.md#open-questions), because RFC 6716 publishes
-the Opus reference implementation as part of the specification.
-
 **Scope.** `alveus-ogg`; `alveus-opus` decoder; Opus in Ogg (RFC 7845) and in
 Matroska.
+
+**Inputs.** RFC 6716 publishes the Opus reference implementation as part of
+the specification. Under
+[ADR-0003](../adr/0003-normative-reference-code-in-specifications.md), only
+the spec writer reads that code and describes its behaviour in spec notes;
+the implementer never reads it.
 
 **Exit criteria.**
 
