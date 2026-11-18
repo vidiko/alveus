@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: EUPL-1.2
 ---
 # Verification gate: runs `make verify-all`, the same target a contributor
-# runs locally. The repository is private on a plan without rulesets, so this
-# gate is the second barrier next to the local hooks until it goes public.
+# runs locally, and checks that every commit carries a sign-off. It is a
+# required status check of the main ruleset, next to the local hooks.
 #
 # The job runs on the fleet's own cluster runner scale set for this
 # repository, not on hosted runners. The standards engine is built here from

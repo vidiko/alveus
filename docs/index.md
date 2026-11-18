@@ -1,5 +1,4 @@
 ---
-title: alveus
 description: Clean-room media framework in Rust from public specifications.
 ---
 
