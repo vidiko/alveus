@@ -10,7 +10,7 @@ The plan in [docs/plan/milestones.md](../plan/milestones.md) starts with one
 container and one codec working end to end. That first slice decides which
 crates exist first and how the test harness checks output, so it should:
 
-- exercise every stage of the pipeline: demux, decode, encode and mux;
+- exercise demux, decode, encode and mux;
 - come with an exact test oracle, so a passing test means the output is
   correct, not just plausible;
 - rest on published, freely readable specifications;
