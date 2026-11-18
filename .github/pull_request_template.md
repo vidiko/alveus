@@ -11,8 +11,12 @@
 - [ ] While preparing this change, I did not read, copy or translate FFmpeg
   or libav source, or source derived from it (forks, patch sets, ports,
   bindings, documentation in their source trees).
-- [ ] Every input I used is a public specification, a spec note, a committed
-  fixture or my own measurement, and is listed below.
+- [ ] Every input I used is listed below and is allowed for the role I held,
+  as the Allowed inputs and Roles tables in CLEANROOM.md define it: as
+  implementer, only public specifications, spec notes and committed
+  fixtures; as spec writer, public specifications and my own black-box
+  measurements. A change that touches no component (documentation, plan)
+  uses only the inputs the Allowed inputs table lists.
 
 **Inputs used** (document and clause, spec note, or measurement):
 

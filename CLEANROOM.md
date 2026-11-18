@@ -43,6 +43,7 @@ implements it.
 | Literature | Published papers and textbooks on signal processing, colour science, entropy coding and resampling |
 | Own measurements | Results of running programs as black boxes: inputs, outputs, hashes, timings, error behaviour (see [Black-box observation](#black-box-observation)) |
 | Conformance material | Published conformance and test streams with their expected results, under their own licences (see [docs/plan/milestones.md](docs/plan/milestones.md)) |
+| General references | Dictionaries and encyclopedias, for documentation prose only (for example the origin of the project name); never a source for code or format behaviour |
 
 Where a specification is mirrored in a repository that also holds FFmpeg or
 libav code, read the published copy from the standards body instead. For FFV1
@@ -109,17 +110,20 @@ output and user documentation may supply option names is an
 ### Agent sessions and lanes
 
 An AI agent session or model lane that has read FFmpeg or libav source, or
-source derived from it, in any project, never writes alveus code or plan text.
-Only a fresh session, or a fresh lane whose brief covers alveus alone, may.
+source derived from it, in any project, never writes alveus code, spec notes,
+test fixtures or plan text. Only a fresh session, or a fresh lane whose brief
+covers alveus alone, may.
 A brief for such a lane carries no memory, notes or state from contaminated
 work.
 
 ### Human contributors
 
 A human contributor who has read FFmpeg or libav source for the component a
-pull request touches does not contribute code for that component. Any other
-past exposure is disclosed in the attestation, and the reviewer decides
-whether the contributor takes the spec-writer role instead.
+pull request touches writes neither code, spec notes nor test fixtures for
+that component, because spec notes and fixtures reach the implementer as
+inputs. Any other past exposure is disclosed in the attestation, and the
+reviewer decides whether the contributor works on the component at all, and
+in which role.
 
 ## Attestation
 
@@ -129,18 +133,24 @@ states:
 
 - that the author did not read, copy or translate forbidden inputs while
   preparing the change;
-- the inputs used, each with document and clause;
+- the inputs used, each with document and clause, and that each is an
+  allowed input for the role the author held: an implementer lists only
+  public specifications, spec notes and committed fixtures, and own
+  measurements are spec-writer input only;
 - who held the spec-writer and implementer roles for the touched components.
 
 Two defences check it, so no single miss lets contaminated work land:
 
 1. Review: the maintainer rejects a pull request whose attestation is missing,
    incomplete or contradicted by its content.
-2. A mechanical check that fails a pull request without a complete attestation
-   block. It is planned for milestone M0 in
-   [docs/plan/milestones.md](docs/plan/milestones.md). Until it lands, review
-   is the only defence, and the maintainer reads every attestation before
-   merging.
+2. A mechanical check that fails a pull request whose attestation block is
+   missing, has an unchecked box, or has an empty or placeholder field. It is
+   planned for milestone M0 in
+   [docs/plan/milestones.md](docs/plan/milestones.md), and it joins the
+   required status checks in
+   [.github/rulesets/main.json](.github/rulesets/main.json) when it lands, so
+   a pull request cannot merge without passing it. Until then, review is the
+   only defence, and the maintainer reads every attestation before merging.
 
 ## When contamination happens
 
@@ -156,6 +166,14 @@ work or someone else's:
 4. The contaminated contributor or session leaves the component, and the
    incident is recorded in a contamination log that the first incident
    creates under `docs/cleanroom/`.
+5. Published history is not rewritten by default. The ruleset forbids force
+   pushes to `main`, and existing clones and forks already hold the commits,
+   so a rewrite would not remove the material. The contamination log names
+   the affected commits, and no later work builds on them. If a case needs
+   the material removed from history as well, for example after a takedown
+   request, the maintainer decides it in a decision record under
+   [docs/adr/](docs/adr/). That record names the rewrite procedure, the
+   temporary ruleset change it needs, and the notice sent to known forks.
 
 ## Open questions
 

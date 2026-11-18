@@ -33,7 +33,8 @@ Matroska demuxer, and AV1 starts after the pipeline milestone M4.
 
 ## Consequences
 
-- **Positive**: Every pipeline stage exists after M2. The EBML and Matroska
+- **Positive**: M2 completes the round trip of demux, decode, encode and
+  mux; filters follow in M4. The EBML and Matroska
   crates carry FLAC, Opus and AV1 later. Lossless decoding gives exact tests
   from the first milestone.
 - **Negative**: The first slice serves few end users; AV1, the codec with the

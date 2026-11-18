@@ -37,8 +37,8 @@ byte source -> demuxer -> decoder -> filters -> encoder -> muxer -> byte sink
 | `alveus-io` | Byte sources and sinks with explicit deadlines, bounded reads, seeking | M0 |
 | `alveus-bits` | Bit readers and writers, variable-length integer and Golomb-family codes | M0 |
 | `alveus-ebml` | EBML elements (RFC 8794): reading, writing, schema-driven validation | M1 |
-| `alveus-matroska` | Matroska demuxer and muxer (RFC 9559) | M1 |
-| `alveus-ffv1` | FFV1 decoder and encoder (RFC 9043) | M1 |
+| `alveus-matroska` | Matroska demuxer and muxer (RFC 9559) | demuxer M1, muxer M2 |
+| `alveus-ffv1` | FFV1 decoder and encoder (RFC 9043) | decoder M1, encoder M2 |
 | `alveus-flac` | FLAC decoder and native FLAC demuxer (RFC 9639) | M3 |
 | `alveus-pipeline` | Stage wiring, bounded queues, the worker pool, stream selection | M4 |
 | `alveus-filters` | Pixel format, colour and sample format conversion; crop and pad | M4 |
@@ -101,9 +101,18 @@ is always available.
 
 A dependency is added only after a licence check (compatible with EUPL-1.2)
 and a provenance check: a crate that ports, translates or binds to FFmpeg or
-libav is never added (see [CLEANROOM.md](../../CLEANROOM.md)). M0 sets up
-`cargo-deny` to keep both checks mechanical, and every dependency is pinned in
-the committed lockfile (HISS-11).
+libav is never added (see [CLEANROOM.md](../../CLEANROOM.md)). Every new crate
+in `Cargo.lock`, direct or transitive, gets both checks.
+
+- The licence check is mechanical: M0 sets up `cargo-deny`, which fails on a
+  licence, source or banned crate outside the policy.
+- The provenance check is a review, because a licence field cannot show
+  whether a crate is a port. The reviewer of the pull request that adds the
+  crate to `Cargo.lock` records the check in that pull request. A crate found
+  to be a port goes on the `cargo-deny` ban list, so from then on the check
+  is mechanical for it.
+
+Every dependency is pinned in the committed lockfile (HISS-11).
 
 ## Toolchain
 

@@ -13,7 +13,7 @@ Each milestone becomes a forge milestone with the title shown in its heading.
 | Milestone | Depends on | Why this order |
 | :--- | :--- | :--- |
 | M0 | — | Gates and the clean-room check exist before the first line of codec code. |
-| M1 | M0 | Matroska and FFV1 form the smallest slice that exercises every stage; FFV1 is lossless, so the original frames are an exact test oracle. |
+| M1 | M0 | Matroska and FFV1 form the smallest slice that covers demux, decode, encode and mux across M1 and M2; FFV1 is lossless, so the original frames are an exact test oracle. |
 | M2 | M1 | Writing what M1 reads closes the round trip. |
 | M3 | M1 | FLAC adds audio and a second container, reusing the Matroska demuxer. |
 | M4 | M2, M3 | The pipeline and command-line tool join the slices and serve the first consumer. |
@@ -42,8 +42,12 @@ format.
 **Exit criteria.**
 
 1. `make verify-all` runs the Rust steps and exits 0 on the default branch.
-2. A planted pull request without an attestation block fails the attestation
-   check, and is closed unmerged once the failure is recorded.
+2. The attestation check has committed fixtures in both directions: a
+   complete attestation passes, and a missing block, an unchecked box and an
+   empty or placeholder field each fail. A planted pull request without an
+   attestation block fails the check on the forge, and is closed unmerged
+   once the failure is recorded. The check is then added to the required
+   status checks in `.github/rulesets/main.json`.
 3. `cargo deny check` rejects a planted dependency with an incompatible
    licence.
 4. The `alveus-bits` reader has positive, negative and boundary tests, and its
@@ -60,20 +64,30 @@ and bit depth RFC 9043 defines, slices and slice CRCs.
 **Test material.**
 
 - The CELLAR working group's Matroska test files
-  (`ietf-wg-cellar/matroska-test-files` on GitHub). Its licence is confirmed
-  before any file is committed; until then the harness downloads the files
-  into a local cache.
+  (`ietf-wg-cellar/matroska-test-files` on GitHub). The repository declares
+  no licence, and its readme names a licence only for the films the clips
+  come from. The spec writer confirms the licence of the files themselves
+  before the harness downloads or uses any of them. If none can be
+  confirmed, the M1 Matroska set consists of files the spec writer produces
+  by running a Matroska muxer as a black box instead.
 - FFV1 streams that the spec writer produces by running an FFV1 encoder as a
   black box on raw frames that `alveus-conformance` generates. Because FFV1
-  is lossless, those raw frames are the expected output.
+  is lossless, those raw frames are the expected output. The spec notes
+  define a test-vector matrix with one cell for every combination of
+  version, coder mode, colour space and bit depth in M1 scope that RFC 9043
+  permits, and the generated streams cover every cell.
 
 **Exit criteria.**
 
-1. Every Matroska test file either demuxes, with packet counts and timestamps
-   matching the expected values in the spec notes, or fails with a typed
+1. Before implementation starts, the spec notes record the expected packet
+   counts and timestamps of every file in the M1 Matroska set, and list the
+   files that use features outside M1 scope. Every file that uses only
+   in-scope features demuxes with packet counts and timestamps matching the
+   spec notes. Only the listed files may fail, and each fails with a typed
    error that names the unsupported feature. No file causes a panic.
-2. Every generated FFV1 stream decodes to frames identical, byte for byte, to
-   the raw frames it was made from.
+2. Every generated FFV1 stream, in the Matroska file the black-box encoder
+   wrote, demuxes with `alveus-matroska` and decodes with `alveus-ffv1` to
+   frames identical, byte for byte, to the raw frames it was made from.
 3. The fuzz targets for EBML, Matroska and FFV1 run for one CPU hour each
    without a crash or hang.
 
@@ -85,7 +99,8 @@ and bit depth RFC 9043 defines, slices and slice CRCs.
 
 1. Encoding, muxing, demuxing and decoding reproduces the input frames
    exactly, for every generated input and every FFV1 version and coder mode
-   the encoder supports.
+   that [scope-matrix.md](scope-matrix.md) lists for encoding (versions 0, 1
+   and 3, both coder modes).
 2. An independent Matroska validator, run as a black box, reports no errors
    on files alveus writes. The testing page names and pins the validator.
 3. An independent FFV1 decoder, run as a black box, decodes alveus's output to
@@ -99,13 +114,22 @@ Matroska.
 **Test material.** The CELLAR working group's FLAC test files
 (`ietf-wg-cellar/flac-test-files` on GitHub, CC0-1.0). RFC 9639 stores an MD5
 checksum of the decoded audio in each stream's STREAMINFO block, which gives
-an exact oracle.
+an exact oracle where it is present. It is not always present: section 8.2 of
+RFC 9639 defines an all-zero value as "not known", and uncommon files 10 and
+11 of the set start at a frame header or with unparsable data, so they carry
+no STREAMINFO block at all. For every such stream, the spec writer records
+the decoded-audio MD5 that two independent decoders, run as black boxes,
+agree on, and commits it as a fixture.
 
 **Exit criteria.**
 
-1. Every file the set marks as valid decodes to audio whose MD5 matches its
-   STREAMINFO checksum.
-2. Every file the set marks as faulty fails with a typed error and no panic.
+1. Before implementation starts, the spec notes list the files in the subset
+   and uncommon groups, which the set's readme calls valid FLAC, that use
+   features outside M3 scope. Every other file in those groups decodes to
+   audio whose MD5 matches its oracle: the STREAMINFO checksum where it is
+   non-zero, otherwise the recorded fixture. Each listed file fails with a
+   typed error that names the unsupported feature.
+2. Every file in the faulty group fails with a typed error and no panic.
 3. A FLAC stream in Matroska decodes to the same samples as the same stream in
    a native FLAC file.
 4. The FLAC fuzz target runs for one CPU hour without a crash or hang.

@@ -32,5 +32,5 @@ contributor who meets [CLEANROOM.md](../../CLEANROOM.md):
 ## Changing the plan
 
 A change to the plan is a pull request that edits these pages. Moving a row
-of the scope matrix to tier X, or changing the order of milestones, also
-needs a decision record under [docs/adr/](../adr/).
+of the scope matrix into or out of tier X, or changing the order of
+milestones, also needs a decision record under [docs/adr/](../adr/).
