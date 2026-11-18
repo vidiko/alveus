@@ -36,6 +36,7 @@ TRACKED = frozenset(
         "LICENSE",
         "docs/index.md",
         "docs/plan/README.md",
+        "docsx/y.md",
         "lua/alveus.lua",
     }
 )
@@ -80,7 +81,13 @@ CASES: list[tuple[str, str, str, list[str], list[str], int]] = [
     ("index.md", "edit/main/docs/", "[a](https://example.org/x)", ["https://example.org/x"], [], 0),
     ("index.md", "edit/main/docs/", "[a](#anchor)", ["#anchor"], [], 0),
     ("index.md", "edit/main/docs/", "[a](plan/README.md)", ["plan/README.md"], [], 0),
-    ("index.md", "edit/main/docs/", "[a](../../x.md)", ["../../x.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../../x.md)", ["../../x.md"], [], 1),
+    ("index.md", "edit/main/docs/", "[a](../)", ["https://github.com/vidiko/alveus/tree/main"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](..)", ["https://github.com/vidiko/alveus/tree/main"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../docs/plan/README.md#h)", ["plan/README.md#h"], [], 0),
+    ("plan/README.md", "edit/main/docs/", "[a](../../docs/index.md)", ["../index.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../docsx/y.md)", [f"{B}docsx/y.md"], [], 0),
+    ("index.md", "edit/main/docs/", "[a](../../outside/)", ["../../outside/"], [], 1),
     ("plan/README.md", "edit/main/docs/", "[a](../../CLEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
     ("index.md", "", "[a](../CLEANROOM.md)", [f"{H}CLEANROOM.md"], [], 0),
 ]
@@ -146,7 +153,7 @@ def _run_case(
 
 
 def main() -> int:
-    """Run all 24 link-rewriting cases and exit 1 on any failure."""
+    """Run all link-rewriting cases and exit 1 on any failure."""
     bad = 0
     for page_uri, edit_uri, src, want_hrefs, want_srcs, want_warns in CASES:
         if not _run_case(page_uri, edit_uri, src, want_hrefs, want_srcs, want_warns):

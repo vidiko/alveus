@@ -59,14 +59,25 @@ extra_css:
 
 plugins:
   - search
+  # Page dates from Git history: the JSON-LD dateModified in
+  # docs/overrides/main.html reads this plugin's raw ISO date, so rebuilding a
+  # revision never changes it. On a shallow GitHub Actions clone, strict logs
+  # a warning that `mkdocs build --strict` turns into a failure (the Docs
+  # workflow checks out full history). A page with no commit yet, such as a
+  # local draft, gets the build date.
+  - git-revision-date-localized:
+      type: iso_date
+      fallback_to_build_date: false
+      strict: true
   # No sitemap plugin: MkDocs core already writes site/sitemap.xml and
   # sitemap.xml.gz from the nav, and the `mkdocs-sitemap-plugin` this block
   # used to name does not exist on PyPI, so `pip install -r requirements.txt`
   # failed and the preset aborted with a config error.
-  - minify:
-      minify_html: true
-      minify_js: true
-      minify_css: true
+  # No minify plugin: `mkdocs-minify-plugin` pulls in source-only dependencies
+  # (`csscompressor`, `htmlmin2` and `jsmin`) that cannot be hash-locked with
+  # their build tools under `--only-binary=:all:`, GitHub Pages already serves
+  # gzip, and minifying saves only 6.4 KB gzipped across the 11 HTML pages
+  # (77,163 to 70,720 bytes) and nothing on the already-minified CSS or JS.
 
 # Rewrite relative Markdown links that leave docs/ (such as ../../CLEANROOM.md)
 # to repository blob URLs on main, and warn when a target file does not exist.

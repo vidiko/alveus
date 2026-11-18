@@ -6,8 +6,13 @@ In on_config, the hook reads the repository's tracked files with git ls-files -z
 and registers a Python-Markdown treeprocessor at priority 15 (after inline link
 parsing at priority 20, before MkDocs' relative-path validator at priority 0).
 In on_page_markdown, the hook records the active page URI on the extension. The
-treeprocessor rewrites anchor hrefs that leave docs/ to forge blob or tree URLs
-when the target is tracked, and logs a warning otherwise so a strict build fails.
+treeprocessor handles relative anchor hrefs that leave docs/ (including ``..``):
+links that step back into docs/ are rewritten to page-relative paths so MkDocs
+validates the target and any heading anchor; links to the repository root
+(``repo_path == "."``) rewrite to the forge tree base URL; links to tracked
+files or directories outside docs/ rewrite to forge blob or tree URLs; and links
+that escape above the repository root or target an untracked repository path log
+a warning so ``mkdocs build --strict`` fails.
 """
 
 from __future__ import annotations
@@ -105,25 +110,25 @@ class RepoLinksExtension(Extension):
         """Record the docs-relative URI of the page about to be rendered."""
         self.src_uri = src_uri.replace("\\", "/")
 
-    def rewrite_href(self, href: str) -> str:
-        """Rewrite one anchor href when it leaves docs/ for a tracked path."""
-        parts = urllib.parse.urlsplit(href)
-        if (
-            parts.scheme
-            or parts.netloc
-            or not parts.path
-            or href.startswith(("/", "\\"))
-            or parts.path.startswith(("/", "\\"))
-        ):
-            return href
-        page_dir = posixpath.dirname(self.src_uri)
-        unquoted = urllib.parse.unquote(parts.path)
-        rel_docs = posixpath.normpath(posixpath.join(page_dir, unquoted))
-        if not rel_docs.startswith("../"):
-            return href
-        repo_path = posixpath.normpath(posixpath.join(self.docs_rel, rel_docs))
-        if repo_path == ".." or repo_path.startswith("../"):
-            return href
+    def _docs_relative_href(
+        self,
+        repo_path: str,
+        page_dir: str,
+        parts: urllib.parse.SplitResult,
+        suffix: str,
+    ) -> str:
+        """Return a page-relative href for a link that re-enters docs/."""
+        in_docs = posixpath.relpath(repo_path, self.docs_rel)
+        rel_page = posixpath.relpath(in_docs, page_dir or ".")
+        quoted = urllib.parse.quote(rel_page)
+        if parts.path.endswith("/") and not quoted.endswith("/"):
+            quoted = f"{quoted}/"
+        return f"{quoted}{suffix}"
+
+    def _forge_href(self, href: str, repo_path: str, suffix: str) -> str:
+        """Return a forge blob or tree URL for repo_path, or warn if untracked."""
+        if repo_path == ".":
+            return f"{self._tree_base}{suffix}"
         if repo_path in self._tracked_files:
             base = self._blob_base
         elif repo_path in self._tracked_dirs:
@@ -138,9 +143,40 @@ class RepoLinksExtension(Extension):
             )
             return href
         quoted = urllib.parse.quote(repo_path)
+        return f"{base}/{quoted}{suffix}"
+
+    def rewrite_href(self, href: str) -> str:
+        """Rewrite one anchor href when it leaves docs/."""
+        parts = urllib.parse.urlsplit(href)
+        if (
+            parts.scheme
+            or parts.netloc
+            or not parts.path
+            or href.startswith(("/", "\\"))
+            or parts.path.startswith(("/", "\\"))
+        ):
+            return href
+        page_dir = posixpath.dirname(self.src_uri)
+        unquoted = urllib.parse.unquote(parts.path)
+        rel_docs = posixpath.normpath(posixpath.join(page_dir, unquoted))
+        if rel_docs != ".." and not rel_docs.startswith("../"):
+            return href
+        repo_path = posixpath.normpath(posixpath.join(self.docs_rel, rel_docs))
+        if repo_path == ".." or repo_path.startswith("../"):
+            _LOG.warning(
+                "Doc file '%s' contains a link '%s' outside docs/, "
+                "and '%s' escapes the repository root.",
+                self.src_uri,
+                href,
+                repo_path,
+            )
+            return href
         query = f"?{parts.query}" if parts.query else ""
         fragment = f"#{parts.fragment}" if parts.fragment else ""
-        return f"{base}/{quoted}{query}{fragment}"
+        suffix = f"{query}{fragment}"
+        if repo_path == self.docs_rel or repo_path.startswith(f"{self.docs_rel}/"):
+            return self._docs_relative_href(repo_path, page_dir, parts, suffix)
+        return self._forge_href(href, repo_path, suffix)
 
     def extendMarkdown(self, md: Markdown) -> None:  # noqa: N802
         """Register the link-rewriting treeprocessor at priority 15."""

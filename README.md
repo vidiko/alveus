@@ -79,8 +79,12 @@ the plan and verify the repository locally:
 1. Read the [milestone ladder](docs/plan/milestones.md) and the
    [scope matrix](docs/plan/scope-matrix.md) to see what is planned and in
    which order.
-2. Clone the repository and run the repository gate, which requires
-   `praetorctl` and `gitleaks` 8.30.1 on `PATH` ([Makefile](Makefile)):
+2. Clone the repository and run the repository gate ([Makefile](Makefile),
+   [.config/praetor/engine.mk](.config/praetor/engine.mk)), which needs Go 1.27
+   or newer and network access on its first run, when
+   [.config/lefthook/engine.sh](.config/lefthook/engine.sh) installs the engine
+   version pinned in [.github/workflows/ci.yml](.github/workflows/ci.yml), and
+   `gitleaks` 8.30.1 on `PATH` ([Makefile](Makefile) line 24):
 
    ```bash
    git clone https://github.com/vidiko/alveus.git

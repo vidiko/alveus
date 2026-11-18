@@ -50,12 +50,15 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          # Full history: the revision-date plugin dates each page by its last
+          # commit, and a shallow clone would date every page at the tip.
+          fetch-depth: 0
           persist-credentials: false
       - name: Install the documentation tools
         run: |
           python3 -m venv "$RUNNER_TEMP/docs"
           "$RUNNER_TEMP/docs/bin/python" -m pip install \
-            --require-hashes -r docs/requirements.txt
+            --require-hashes --only-binary=:all: -r docs/requirements.txt
       - name: Test the link hook
         run: |
           "$RUNNER_TEMP/docs/bin/python" -I -B docs/hooks/test_repo_links.py .
