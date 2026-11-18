@@ -46,7 +46,7 @@ implements it.
 | Hardware and platform APIs | Vendor API references and the public headers that define those APIs (Khronos Vulkan Video, VA-API, vendor video SDKs) | Both roles |
 | Literature | Published papers and textbooks on signal processing, colour science, entropy coding and resampling | Both roles |
 | Own measurements | Results of running programs as black boxes: inputs, outputs, hashes, timings, error behaviour, help output (see [Black-box observation](#black-box-observation) and [ADR-0002](docs/adr/0002-command-line-names-from-observation.md)) | Spec writer only |
-| Conformance material | Published conformance and test streams with their expected results, and test vectors taken from a specification. Licence first: the licence of each file is confirmed and recorded before use, and each committed file carries a REUSE notice in [REUSE.toml](REUSE.toml) or a `.license` file (see [docs/plan/milestones.md](docs/plan/milestones.md#m1-matroska-demux-and-ffv1-decode-bit-exact) and [ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)) | Both roles |
+| Conformance material | Published conformance and test streams with their expected results, and test vectors taken from a specification. Licence first: before a file is used, its licence is recorded and confirmed to permit committing and redistributing the file with alveus under conditions the project meets, and each committed file carries a REUSE notice in [REUSE.toml](REUSE.toml) or a `.license` file (see [docs/plan/milestones.md](docs/plan/milestones.md#m1-matroska-demux-and-ffv1-decode-bit-exact) and [ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)) | Both roles |
 | General references | Dictionaries and encyclopedias, for documentation prose only (for example the origin of the project name); never a source for code or format behaviour | Both roles |
 
 Where a specification is mirrored in a repository that also holds FFmpeg or
@@ -69,7 +69,12 @@ of alveus, code or documentation:
 Reading the source of other media implementations is not an input either.
 Other implementations may serve alveus in two ways only: as a dependency after
 a licence and provenance review, or as a black box whose behaviour is
-measured.
+measured. The one exception is code that a specification publishes as its
+normative part, such as the Opus reference implementation in RFC 6716: the
+spec writer, and no one else, reads it as part of that specification (see
+[Allowed inputs](#allowed-inputs) and
+[ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)). The
+exception never covers FFmpeg or libav source.
 
 ## C ports: behaviour reference only
 
@@ -122,7 +127,8 @@ only the spec writer records, as a measurement
 documentation and man pages live in the source tree and are not allowed
 inputs. Command-line option names for the compatibility levels in
 [docs/plan/scope-matrix.md](docs/plan/scope-matrix.md) reach the implementer
-only through spec notes.
+only through spec notes and the fixtures the spec writer commits, such as the
+command-line corpus of level L2.
 
 ### Agent sessions and lanes
 

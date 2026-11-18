@@ -39,8 +39,10 @@ runs of the FFmpeg command-line tool
 writer runs the tool and records the observed option names and behaviour in
 spec notes, in their own words, as a measurement
 ([CLEANROOM.md](../../CLEANROOM.md#roles)). The implementer receives option
-names only through those spec notes and committed fixtures. FFmpeg's user
-documentation and man pages stay out of the allowed inputs
+names only through those spec notes and the fixtures the spec writer commits,
+such as the command-line corpus of level L2, as for any other observed
+behaviour ([CLEANROOM.md](../../CLEANROOM.md#black-box-observation)).
+FFmpeg's user documentation and man pages stay out of the allowed inputs
 ([CLEANROOM.md](../../CLEANROOM.md#forbidden-inputs)), because they live in its
 source tree.
 

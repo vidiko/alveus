@@ -43,15 +43,19 @@ notes for transliteration of the C structure (control flow, function split,
 naming, or data layout copied from the code instead of described by
 behaviour) and rejects pull requests whose spec notes transliterate it.
 
-Because only the spec writer reads the normative reference code and writes spec
-notes in their own words, no normative reference code enters alveus, and no
-code licence carries over. Test vectors or other files taken from a
+Spec notes copy no expression of the code: they describe its behaviour in the
+spec writer's own words, and review rejects notes that transliterate its
+structure. On that basis no normative reference code enters alveus, and no
+code licence carries over. A specification whose own terms restrict reading
+the code it publishes, or describing that code, falls outside this record
+until it is revisited. Test vectors or other files taken from a
 specification are fixtures and follow the licence-first rule for conformance
 material ([CLEANROOM.md](../../CLEANROOM.md#allowed-inputs), as applied to
 the M1 test material in [docs/plan/milestones.md](../plan/milestones.md)):
-their licence is confirmed and recorded before use, and each committed file
-carries a REUSE notice in [REUSE.toml](../../REUSE.toml) or a companion
-`.license` file.
+before a file is used, its licence is recorded and confirmed to permit
+committing and redistributing the file with alveus under conditions the
+project meets, and each committed file carries a REUSE notice in
+[REUSE.toml](../../REUSE.toml) or a companion `.license` file.
 
 ## Consequences
 
