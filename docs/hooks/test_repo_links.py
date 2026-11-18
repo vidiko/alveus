@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: EUPL-1.2
 """Positive, negative and boundary cases for docs/hooks/repo_links.py.
 
-Run from the repository root: python3 -I docs/hooks/test_repo_links.py .
+Run from the repository root: python3 -I -B docs/hooks/test_repo_links.py .
 """
 
 import importlib.util
