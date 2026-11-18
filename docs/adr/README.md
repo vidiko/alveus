@@ -8,3 +8,4 @@ record that supersedes it.
 | Number | Date | Title | Status |
 | :--- | :--- | :--- | :--- |
 | [0000](0000-template.md) | 2026-09-11 | ADR template | Accepted |
+| [0001](0001-first-slice-matroska-ffv1.md) | 2026-11-18 | First vertical slice is Matroska with FFV1 | Accepted |
