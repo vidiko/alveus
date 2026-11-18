@@ -13,8 +13,9 @@
   bindings, documentation in their source trees).
 - [ ] Every input I used is listed below and is allowed for the role I held,
   as the Allowed inputs and Roles tables in CLEANROOM.md define it. As
-  implementer, I used no measurements of my own: other programs' behaviour
-  reached me only through spec notes and committed fixtures. A change that
+  implementer, I used only the inputs marked for both roles and no
+  measurements of my own: other programs' behaviour reached me only through
+  spec notes and committed fixtures. A change that
   touches no component (documentation, plan) uses only the inputs the
   Allowed inputs table lists.
 

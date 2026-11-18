@@ -68,7 +68,9 @@ implements the traits for its component:
   first frame.
 - Format detection is a function per container crate that scores the first
   bytes of an input. The pipeline asks every linked container crate and picks
-  the highest score.
+  the highest score. When two crates return the same highest score,
+  detection fails with an ambiguity error that names both formats, and the
+  caller then names the format explicitly.
 
 Components are registered at compile time through Cargo features. There is no
 plugin loading at run time: the repository standard bans dynamic code

@@ -22,28 +22,31 @@ three rules:
    documentation that lives in their source trees.
 2. **Work from public specifications.** ITU-T Recommendations, ISO/IEC
    standards, IETF RFCs and Internet-Drafts, and the other published
-   specifications listed under [Allowed inputs](#allowed-inputs), plus
-   measurements you made yourself.
+   specifications listed under [Allowed inputs](#allowed-inputs). Spec
+   writers may add measurements made by running programs as black boxes;
+   implementers receive those only as spec notes and committed fixtures
+   (see [Roles](#roles)).
 3. **Attest it in every pull request.** The pull request template
    ([.github/pull_request_template.md](.github/pull_request_template.md))
    carries the attestation. A pull request without it is not reviewed.
 
 ## Allowed inputs
 
-A contributor may use these sources. Cite the document and the clause, section
+A contributor may use the sources that the last column marks for the role
+they hold (see [Roles](#roles)). Cite the document and the clause, section
 or page in the pull request and in the module documentation of the code that
 implements it.
 
-| Kind | Examples |
-| :--- | :--- |
-| Standards bodies | ITU-T Recommendations (H.264, H.265, H.266, H.273), ITU-R Recommendations (BT.601, BT.709, BT.2020), ISO/IEC standards (14496-12, 23009-1) |
-| IETF | RFCs (RFC 8794 EBML, RFC 9559 Matroska, RFC 9043 FFV1, RFC 9639 FLAC, RFC 6716 Opus, RFC 3533 Ogg) and Internet-Drafts of the CELLAR working group, read from `rfc-editor.org` or `datatracker.ietf.org` |
-| Format and codec specifications | AOMedia AV1 Bitstream and Decoding Process Specification, the Matroska and WebM container documentation, Xiph specifications |
-| Hardware and platform APIs | Vendor API references and the public headers that define those APIs (Khronos Vulkan Video, VA-API, vendor video SDKs) |
-| Literature | Published papers and textbooks on signal processing, colour science, entropy coding and resampling |
-| Own measurements | Results of running programs as black boxes: inputs, outputs, hashes, timings, error behaviour (see [Black-box observation](#black-box-observation)) |
-| Conformance material | Published conformance and test streams with their expected results, under their own licences (see [docs/plan/milestones.md](docs/plan/milestones.md)) |
-| General references | Dictionaries and encyclopedias, for documentation prose only (for example the origin of the project name); never a source for code or format behaviour |
+| Kind | Examples | Used by |
+| :--- | :--- | :--- |
+| Standards bodies | ITU-T Recommendations (H.264, H.265, H.266, H.273), ITU-R Recommendations (BT.601, BT.709, BT.2020), ISO/IEC standards (14496-12, 23009-1) | Both roles |
+| IETF | RFCs (RFC 8794 EBML, RFC 9559 Matroska, RFC 9043 FFV1, RFC 9639 FLAC, RFC 6716 Opus, RFC 3533 Ogg) and Internet-Drafts of the CELLAR working group, read from `rfc-editor.org` or `datatracker.ietf.org` | Both roles |
+| Format and codec specifications | AOMedia AV1 Bitstream and Decoding Process Specification, the Matroska and WebM container documentation, Xiph specifications | Both roles |
+| Hardware and platform APIs | Vendor API references and the public headers that define those APIs (Khronos Vulkan Video, VA-API, vendor video SDKs) | Both roles |
+| Literature | Published papers and textbooks on signal processing, colour science, entropy coding and resampling | Both roles |
+| Own measurements | Results of running programs as black boxes: inputs, outputs, hashes, timings, error behaviour (see [Black-box observation](#black-box-observation)) | Spec writer only |
+| Conformance material | Published conformance and test streams with their expected results, under their own licences (see [docs/plan/milestones.md](docs/plan/milestones.md)) | Both roles |
+| General references | Dictionaries and encyclopedias, for documentation prose only (for example the origin of the project name); never a source for code or format behaviour | Both roles |
 
 Where a specification is mirrored in a repository that also holds FFmpeg or
 libav code, read the published copy from the standards body instead. For FFV1
@@ -89,8 +92,8 @@ spec notes is not the one that writes the implementation.
 
 | Role | May use | Produces |
 | :--- | :--- | :--- |
-| Spec writer | The documents in [Allowed inputs](#allowed-inputs) (specifications, API references, literature, conformance material); black-box observation of other programs | Spec notes in their own words: clause references, bit layouts, test vectors, measured behaviour |
-| Implementer | The documents in [Allowed inputs](#allowed-inputs) (specifications, API references, literature, conformance material); spec notes; committed test fixtures | Code and tests that cite the clauses they implement |
+| Spec writer | Every row of [Allowed inputs](#allowed-inputs), including black-box observation of other programs | Spec notes in their own words: clause references, bit layouts, test vectors, measured behaviour |
+| Implementer | The rows of [Allowed inputs](#allowed-inputs) marked for both roles (specifications, API references, literature, conformance material); spec notes; committed test fixtures | Code and tests that cite the clauses they implement |
 
 The implementer never explores other implementations' behaviour directly.
 Their contact with other programs is through fixtures the spec writer or the
@@ -133,24 +136,39 @@ states:
 
 - that the author did not read, copy or translate forbidden inputs while
   preparing the change;
-- the inputs used, each with document and clause, and that each is an
-  allowed input for the role the author held: own black-box measurements
-  are spec-writer input only, and an implementer reaches other programs'
-  behaviour only through spec notes and committed fixtures;
+- the inputs used, each with document and clause, and that the last column
+  of [Allowed inputs](#allowed-inputs) marks each for the role the author
+  held: an implementer uses only the rows marked for both roles, and
+  reaches other programs' behaviour only through spec notes and committed
+  fixtures;
 - who held the spec-writer and implementer roles for the touched components.
 
-Two defences check it, so no single miss lets contaminated work land:
+Three checks cover it, and each catches a different failure:
 
 1. Review: the maintainer rejects a pull request whose attestation is missing,
-   incomplete or contradicted by its content.
-2. A mechanical check that fails a pull request whose attestation block is
-   missing, has an unchecked box, or has an empty or placeholder field. It is
-   planned for milestone M0 in
-   [docs/plan/milestones.md](docs/plan/milestones.md), and it joins the
-   required status checks in
-   [.github/rulesets/main.json](.github/rulesets/main.json) when it lands, so
-   a pull request cannot merge without passing it. Until then, review is the
-   only defence, and the maintainer reads every attestation before merging.
+   incomplete or contradicted by its content, for example code whose
+   behaviour no cited clause describes.
+2. The attestation check: a mechanical check that fails a pull request whose
+   attestation block is missing, has an unchecked box, or has an empty or
+   placeholder field. It checks that the attestation is complete, not that
+   it is true.
+3. The provenance scan: a licence and copyright scanner run over every
+   changed file, which fails on a notice that names FFmpeg, libav or another
+   forbidden source. It catches copied code that kept its notices.
+
+Checks 2 and 3 are planned for milestone M0 in
+[docs/plan/milestones.md](docs/plan/milestones.md). Each joins the required
+status checks in [.github/rulesets/main.json](.github/rulesets/main.json)
+when it lands, so a pull request cannot merge without passing it. Until
+then, review is the only check, and the maintainer reads every attestation
+before merging.
+
+No check proves that a complete attestation is true. A missing or incomplete
+attestation meets two checks (1 and 2), and so does copied code that kept its
+notices (1 and 3). Code that was translated, or copied with its notices
+removed, under a complete but false attestation meets review alone. The
+policy therefore relies on contributors attesting truthfully, and a false
+attestation found after merging is handled as contamination (below).
 
 ## When contamination happens
 

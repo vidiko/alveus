@@ -9,8 +9,9 @@ alveus is a planned media framework in Rust: containers, codecs, filters and
 a command-line tool, written clean-room from public specifications.
 
 **Status: planning.** There is no framework code yet. The plan is in
-[docs/plan/](docs/plan/README.md), and the first code milestone is Matroska
-demuxing with FFV1 decoding ([milestones](docs/plan/milestones.md)).
+[docs/plan/](docs/plan/README.md). Milestone M0 sets up the workspace and
+the gates, and the first media milestone, M1, is Matroska demuxing with FFV1
+decoding ([milestones](docs/plan/milestones.md)).
 
 ## The name
 
@@ -33,8 +34,10 @@ The project writes the name in lower case: alveus.
 ## Clean room
 
 alveus contains no code read, copied or translated from FFmpeg, libav or
-anything derived from them. Contributors work from public specifications and
-their own measurements, and attest this in every pull request.
+anything derived from them. Contributors work from public specifications.
+Spec writers add measurements made by running programs as black boxes, and
+implementers receive those only as spec notes and committed fixtures. Every
+pull request attests this.
 [CLEANROOM.md](CLEANROOM.md) holds the rules, the roles and the attestation.
 
 ## Contributing

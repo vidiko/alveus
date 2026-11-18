@@ -28,7 +28,7 @@ component.
 | Native FLAC | RFC 9639 | P0, M3 | P2 |
 | Ogg | RFC 3533; Opus mapping RFC 7845 | P1, M5 | P2 |
 | ISO base media file format (MP4) | ISO/IEC 14496-12; AV1 binding from the AOMedia AV1 Codec ISO Media File Format Binding | P1, M7 | P2 |
-| YUV4MPEG2 (Y4M) raw video | No standards-body specification; the spec writer documents the header grammar from public descriptions and measurement | P1, M4 | P1, M4 |
+| YUV4MPEG2 (Y4M) raw video | No published specification; the spec writer documents the header grammar from black-box measurement only, because [CLEANROOM.md](../../CLEANROOM.md#allowed-inputs) lists no input for informal format descriptions | P1, M4 | P1, M4 |
 | RIFF WAVE | Vendor specification | P2 | P2 |
 | MPEG-2 transport stream | ITU-T H.222.0 (ISO/IEC 13818-1) | P2 | P3 |
 | Other legacy containers | — | P3 | X |

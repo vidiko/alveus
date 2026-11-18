@@ -35,9 +35,9 @@ specification edition and list the clauses the milestone covers.
 
 **Scope.** Cargo workspace with `alveus-core`, `alveus-io`, `alveus-bits` and
 `alveus-conformance`; pinned toolchain; `cargo fmt`, `cargo clippy`,
-`cargo test` and `cargo deny` in `make verify-all`; the attestation check from
-[CLEANROOM.md](../../CLEANROOM.md#attestation); the conformance manifest
-format.
+`cargo test` and `cargo deny` in `make verify-all`; the attestation check and
+the provenance scan from [CLEANROOM.md](../../CLEANROOM.md#attestation); the
+conformance manifest format.
 
 **Exit criteria.**
 
@@ -48,9 +48,12 @@ format.
    attestation block fails the check on the forge, and is closed unmerged
    once the failure is recorded. The check is then added to the required
    status checks in `.github/rulesets/main.json`.
-3. `cargo deny check` rejects a planted dependency with an incompatible
+3. The provenance scan fails a planted file whose header names FFmpeg as its
+   copyright holder, passes the repository without it, and is then added to
+   the required status checks in `.github/rulesets/main.json`.
+4. `cargo deny check` rejects a planted dependency with an incompatible
    licence.
-4. The `alveus-bits` reader has positive, negative and boundary tests, and its
+5. The `alveus-bits` reader has positive, negative and boundary tests, and its
    fuzz target runs for one CPU hour without a crash or hang.
 
 ## M1: Matroska demux and FFV1 decode, bit-exact
@@ -156,6 +159,12 @@ contract is a follow-up page listed in [README.md](README.md).
    runs more workers than its configured maximum.
 4. A VMAF score computed from alveus-decoded frames equals the score computed
    from the same file decoded by an independent decoder run as a black box.
+5. Converting through standard input and standard output gives the same
+   frame hashes as converting between files.
+6. Matroska files with PCM audio, uncompressed video and text tracks, which
+   the spec writer produces by running a Matroska muxer as a black box, pass
+   through demux and mux unchanged: the codec ID, codec private data, block
+   payloads and timestamps of every track equal the input's.
 
 ## M5: Ogg demux and Opus decode
 
@@ -174,6 +183,9 @@ Matroska.
    no panic.
 3. The Ogg and Opus fuzz targets run for one CPU hour each without a crash or
    hang.
+4. Each test vector, put into Matroska by a Matroska muxer that the spec
+   writer runs as a black box, decodes to the same samples as the same
+   stream in Ogg.
 
 ## M6: AV1 decode with Argon Streams conformance
 
@@ -192,6 +204,9 @@ Media in September 2022.
 2. An independent AV1 decoder, run as a black box, produces the same frames
    on a sample of real-world streams.
 3. The AV1 fuzz target runs for one CPU hour without a crash or hang.
+4. A sample of Argon streams, put into Matroska and into WebM by a muxer that
+   the spec writer runs as a black box, decodes to the same output hashes as
+   the streams on their own.
 
 ## M7: ISO base media file format demux
 
