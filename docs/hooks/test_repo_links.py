@@ -1,9 +1,8 @@
 # SPDX-FileCopyrightText: 2026 Lusoris <lusoris@pm.me>
 # SPDX-License-Identifier: EUPL-1.2
-"""Positive, negative and boundary cases for docs/hooks/repo_links.py.
+"""Test docs/hooks/repo_links.py."""
 
-Run from the repository root: python3 -I -B docs/hooks/test_repo_links.py .
-"""
+# Run from the repository root: python3 -I -B docs/hooks/test_repo_links.py .
 
 from __future__ import annotations
 
@@ -44,15 +43,64 @@ B = "https://github.com/vidiko/alveus/blob/main/"
 T = "https://github.com/vidiko/alveus/tree/main/"
 H = "https://github.com/vidiko/alveus/blob/HEAD/"
 
-# Each entry: (page_uri, edit_uri, markdown_src, expected_hrefs, expected_srcs, warnings)
+# Each entry: page URI, edit URI, source, expected hrefs, sources, warnings.
 CASES: list[tuple[str, str, str, list[str], list[str], int]] = [
-    ("index.md", "edit/main/docs/", "[a](../CLEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
-    ("index.md", "edit/main/docs/", "[a](../CLEANROOM.md#anchor)", [f"{B}CLEANROOM.md#anchor"], [], 0),
-    ("index.md", "edit/main/docs/", "[a](../CLEANROOM.md?plain=1#x)", [f"{B}CLEANROOM.md?plain=1#x"], [], 0),
-    ("index.md", "edit/main/docs/", '[a](../CLEANROOM.md "t")', [f"{B}CLEANROOM.md"], [], 0),
-    ("index.md", "edit/main/docs/", "[a](<../CLEANROOM.md>)", [f"{B}CLEANROOM.md"], [], 0),
-    ("index.md", "edit/main/docs/", "[b][r]\n\n[r]: ../CLEANROOM.md", [f"{B}CLEANROOM.md"], [], 0),
-    ("index.md", "edit/main/docs/", "[first\nsecond](../CLEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](../CLEANROOM.md)",
+        [f"{B}CLEANROOM.md"],
+        [],
+        0,
+    ),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](../CLEANROOM.md#anchor)",
+        [f"{B}CLEANROOM.md#anchor"],
+        [],
+        0,
+    ),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](../CLEANROOM.md?plain=1#x)",
+        [f"{B}CLEANROOM.md?plain=1#x"],
+        [],
+        0,
+    ),
+    (
+        "index.md",
+        "edit/main/docs/",
+        '[a](../CLEANROOM.md "t")',
+        [f"{B}CLEANROOM.md"],
+        [],
+        0,
+    ),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](<../CLEANROOM.md>)",
+        [f"{B}CLEANROOM.md"],
+        [],
+        0,
+    ),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[b][r]\n\n[r]: ../CLEANROOM.md",
+        [f"{B}CLEANROOM.md"],
+        [],
+        0,
+    ),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[first\nsecond](../CLEANROOM.md)",
+        [f"{B}CLEANROOM.md"],
+        [],
+        0,
+    ),
     (
         "index.md",
         "edit/main/docs/",
@@ -72,23 +120,79 @@ CASES: list[tuple[str, str, str, list[str], list[str], int]] = [
     ),
     ("index.md", "edit/main/docs/", "```md\n[a](../CLEANROOM.md)\n```", [], [], 0),
     ("index.md", "edit/main/docs/", "~~~\n[a](../CLEANROOM.md)\n~~~", [], [], 0),
-    ("index.md", "edit/main/docs/", "- item\n\n  ```\n  [a](../CLEANROOM.md)\n  ```", [], [], 0),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "- item\n\n  ```\n  [a](../CLEANROOM.md)\n  ```",
+        [],
+        [],
+        0,
+    ),
     ("index.md", "edit/main/docs/", "    [a](../CLEANROOM.md)", [], [], 0),
     ("index.md", "edit/main/docs/", "[a](../lua/)", [f"{T}lua"], [], 0),
-    ("index.md", "edit/main/docs/", "[a](../%43LEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](../%43LEANROOM.md)",
+        [f"{B}CLEANROOM.md"],
+        [],
+        0,
+    ),
     ("index.md", "edit/main/docs/", "[a](../SECURITY.md)", ["../SECURITY.md"], [], 1),
     ("index.md", "edit/main/docs/", "[a](../NO-SUCH.md)", ["../NO-SUCH.md"], [], 1),
-    ("index.md", "edit/main/docs/", "[a](https://example.org/x)", ["https://example.org/x"], [], 0),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](https://example.org/x)",
+        ["https://example.org/x"],
+        [],
+        0,
+    ),
     ("index.md", "edit/main/docs/", "[a](#anchor)", ["#anchor"], [], 0),
     ("index.md", "edit/main/docs/", "[a](plan/README.md)", ["plan/README.md"], [], 0),
     ("index.md", "edit/main/docs/", "[a](../../x.md)", ["../../x.md"], [], 1),
-    ("index.md", "edit/main/docs/", "[a](../)", ["https://github.com/vidiko/alveus/tree/main"], [], 0),
-    ("index.md", "edit/main/docs/", "[a](..)", ["https://github.com/vidiko/alveus/tree/main"], [], 0),
-    ("index.md", "edit/main/docs/", "[a](../docs/plan/README.md#h)", ["plan/README.md#h"], [], 0),
-    ("plan/README.md", "edit/main/docs/", "[a](../../docs/index.md)", ["../index.md"], [], 0),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](../)",
+        ["https://github.com/vidiko/alveus/tree/main"],
+        [],
+        0,
+    ),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](..)",
+        ["https://github.com/vidiko/alveus/tree/main"],
+        [],
+        0,
+    ),
+    (
+        "index.md",
+        "edit/main/docs/",
+        "[a](../docs/plan/README.md#h)",
+        ["plan/README.md#h"],
+        [],
+        0,
+    ),
+    (
+        "plan/README.md",
+        "edit/main/docs/",
+        "[a](../../docs/index.md)",
+        ["../index.md"],
+        [],
+        0,
+    ),
     ("index.md", "edit/main/docs/", "[a](../docsx/y.md)", [f"{B}docsx/y.md"], [], 0),
     ("index.md", "edit/main/docs/", "[a](../../outside/)", ["../../outside/"], [], 1),
-    ("plan/README.md", "edit/main/docs/", "[a](../../CLEANROOM.md)", [f"{B}CLEANROOM.md"], [], 0),
+    (
+        "plan/README.md",
+        "edit/main/docs/",
+        "[a](../../CLEANROOM.md)",
+        [f"{B}CLEANROOM.md"],
+        [],
+        0,
+    ),
     ("index.md", "", "[a](../CLEANROOM.md)", [f"{H}CLEANROOM.md"], [], 0),
 ]
 
