@@ -89,8 +89,8 @@ spec notes is not the one that writes the implementation.
 
 | Role | May use | Produces |
 | :--- | :--- | :--- |
-| Spec writer | Public specifications; black-box observation of other programs | Spec notes in their own words: clause references, bit layouts, test vectors, measured behaviour |
-| Implementer | Public specifications; spec notes; committed test fixtures | Code and tests that cite the clauses they implement |
+| Spec writer | The documents in [Allowed inputs](#allowed-inputs) (specifications, API references, literature, conformance material); black-box observation of other programs | Spec notes in their own words: clause references, bit layouts, test vectors, measured behaviour |
+| Implementer | The documents in [Allowed inputs](#allowed-inputs) (specifications, API references, literature, conformance material); spec notes; committed test fixtures | Code and tests that cite the clauses they implement |
 
 The implementer never explores other implementations' behaviour directly.
 Their contact with other programs is through fixtures the spec writer or the
@@ -134,9 +134,9 @@ states:
 - that the author did not read, copy or translate forbidden inputs while
   preparing the change;
 - the inputs used, each with document and clause, and that each is an
-  allowed input for the role the author held: an implementer lists only
-  public specifications, spec notes and committed fixtures, and own
-  measurements are spec-writer input only;
+  allowed input for the role the author held: own black-box measurements
+  are spec-writer input only, and an implementer reaches other programs'
+  behaviour only through spec notes and committed fixtures;
 - who held the spec-writer and implementer roles for the touched components.
 
 Two defences check it, so no single miss lets contaminated work land:
