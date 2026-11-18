@@ -181,8 +181,8 @@ flowchart TD
   M2["M2 FFV1 encode & Matroska mux"]:::step
   M3["M3 FLAC decode (FLAC & Matroska)"]:::step
   M4["M4 Pipeline, CLI L0 & raw frames"]:::step
-  M5["M5 Ogg demux and Opus decode"]:::step
   M6["M6 AV1 decode (Argon Streams)"]:::step
+  M5["M5 Ogg demux and Opus decode"]:::step
   M7["M7 ISO base media format demux"]:::step
 
   M0 --> M1
@@ -190,8 +190,8 @@ flowchart TD
   M1 --> M3
   M2 --> M4
   M3 --> M4
-  M4 --> M5
   M4 --> M6
+  M4 --> M5
   M6 --> M7
 ```
 
