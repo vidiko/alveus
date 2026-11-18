@@ -179,13 +179,21 @@ Three checks cover it, and each catches a different failure:
    changed file, which fails on a notice that names FFmpeg, libav or another
    forbidden source. It catches copied code that kept its notices.
 
-Checks 2 and 3 are planned for milestone M0 in
-[docs/plan/milestones.md](docs/plan/milestones.md). Each joins the required
-status checks in [.github/rulesets/main.json](.github/rulesets/main.json)
-when it lands, so a pull request cannot merge without passing it. Until
-then, review is the only check. Only the maintainer has write access to the
-repository, so every merge passes through the maintainer's review, and no
-other contributor gets write access before both checks are required.
+Check 2 runs as the `Clean-room attestation` job of
+[.github/workflows/cleanroom.yml](.github/workflows/cleanroom.yml)
+([tools/cleanroom/attestation.py](tools/cleanroom/attestation.py), fixtures
+under
+[tools/cleanroom/fixtures/attestation/](tools/cleanroom/fixtures/attestation/))
+and reruns whenever a pull request's description is edited.
+[.github/rulesets/main.json](.github/rulesets/main.json) lists it among the
+required status checks, and the ruleset on the forge takes the same list once
+planted pull requests have shown the check fails there (criterion 2 of
+milestone M0 in [docs/plan/milestones.md](docs/plan/milestones.md)). Check 3
+is planned for milestone M0 and joins the required status checks when it
+lands, so a pull request cannot merge without passing both checks. Until then,
+only the maintainer has write access to the repository, so every merge passes
+through the maintainer's review, and no other contributor gets write access
+before both checks are required.
 
 The ruleset lets the repository admin role bypass it when merging a pull
 request, because the repository has a single maintainer and requires no

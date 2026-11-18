@@ -54,6 +54,9 @@
             "context": "Verification gate"
           },
           {
+            "context": "Clean-room attestation"
+          },
+          {
             "context": "Docs build"
           },
           {
