@@ -39,13 +39,14 @@ implements it.
 
 | Kind | Examples | Used by |
 | :--- | :--- | :--- |
-| Standards bodies | ITU-T Recommendations (H.264, H.265, H.266, H.273), ITU-R Recommendations (BT.601, BT.709, BT.2020), ISO/IEC standards (14496-12, 23009-1) | Both roles |
-| IETF | RFCs (RFC 8794 EBML, RFC 9559 Matroska, RFC 9043 FFV1, RFC 9639 FLAC, RFC 6716 Opus, RFC 3533 Ogg) and Internet-Drafts of the CELLAR working group, read from `rfc-editor.org` or `datatracker.ietf.org` | Both roles |
-| Format and codec specifications | AOMedia AV1 Bitstream and Decoding Process Specification, the Matroska and WebM container documentation, Xiph specifications | Both roles |
+| Standards bodies | ITU-T Recommendations (H.264, H.265, H.266, H.273), ITU-R Recommendations (BT.601, BT.709, BT.2020), ISO/IEC standards (14496-12, 23009-1); specification text only, not code published as a normative part | Both roles |
+| IETF | RFCs (RFC 8794 EBML, RFC 9559 Matroska, RFC 9043 FFV1, RFC 9639 FLAC, RFC 6716 Opus, RFC 3533 Ogg) and Internet-Drafts of the CELLAR working group, read from `rfc-editor.org` or `datatracker.ietf.org`; specification text only, not code published as a normative part | Both roles |
+| Format and codec specifications | AOMedia AV1 Bitstream and Decoding Process Specification, the Matroska and WebM container documentation, Xiph specifications; specification text only, not code published as a normative part | Both roles |
+| Normative reference code in specifications | Code published inside a specification as part of its normative definition (for example the Opus reference implementation in RFC 6716; see [ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)) | Spec writer only |
 | Hardware and platform APIs | Vendor API references and the public headers that define those APIs (Khronos Vulkan Video, VA-API, vendor video SDKs) | Both roles |
 | Literature | Published papers and textbooks on signal processing, colour science, entropy coding and resampling | Both roles |
-| Own measurements | Results of running programs as black boxes: inputs, outputs, hashes, timings, error behaviour (see [Black-box observation](#black-box-observation)) | Spec writer only |
-| Conformance material | Published conformance and test streams with their expected results, under their own licences (see [docs/plan/milestones.md](docs/plan/milestones.md)) | Both roles |
+| Own measurements | Results of running programs as black boxes: inputs, outputs, hashes, timings, error behaviour, help output (see [Black-box observation](#black-box-observation) and [ADR-0002](docs/adr/0002-command-line-names-from-observation.md)) | Spec writer only |
+| Conformance material | Published conformance and test streams with their expected results, and test vectors taken from a specification. Licence first: before a file is used, its licence is recorded and confirmed to permit committing and redistributing the file with alveus under conditions the project meets, and each committed file carries a REUSE notice in [REUSE.toml](REUSE.toml) or a `.license` file (see [docs/plan/milestones.md](docs/plan/milestones.md#m1-matroska-demux-and-ffv1-decode-bit-exact) and [ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)) | Both roles |
 | General references | Dictionaries and encyclopedias, for documentation prose only (for example the origin of the project name); never a source for code or format behaviour | Both roles |
 
 Where a specification is mirrored in a repository that also holds FFmpeg or
@@ -68,7 +69,12 @@ of alveus, code or documentation:
 Reading the source of other media implementations is not an input either.
 Other implementations may serve alveus in two ways only: as a dependency after
 a licence and provenance review, or as a black box whose behaviour is
-measured.
+measured. The one exception is code that a specification publishes as its
+normative part, such as the Opus reference implementation in RFC 6716: the
+spec writer, and no one else, reads it as part of that specification (see
+[Allowed inputs](#allowed-inputs) and
+[ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)). The
+exception never covers FFmpeg or libav source.
 
 ## C ports: behaviour reference only
 
@@ -92,12 +98,20 @@ spec notes is not the one that writes the implementation.
 
 | Role | May use | Produces |
 | :--- | :--- | :--- |
-| Spec writer | Every row of [Allowed inputs](#allowed-inputs), including black-box observation of other programs | Spec notes in their own words: clause references, bit layouts, test vectors, measured behaviour |
-| Implementer | The rows of [Allowed inputs](#allowed-inputs) marked for both roles (specifications, API references, literature, conformance material); spec notes; committed test fixtures | Code and tests that cite the clauses they implement |
+| Spec writer | Every row of [Allowed inputs](#allowed-inputs), including normative reference code in specifications and black-box observation of other programs | Spec notes in their own words: clause and RFC section references, bit layouts, test vectors, measured behaviour, and behaviour of normative reference code described without transliterating its structure |
+| Implementer | The rows of [Allowed inputs](#allowed-inputs) marked for both roles (specification text, API references, literature, conformance material), never normative reference code; spec notes; committed test fixtures | Code and tests that cite the clauses they implement |
 
-The implementer never explores other implementations' behaviour directly.
+The implementer never explores other implementations' behaviour directly, and
+never reads normative reference code published inside a specification
+([ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)).
 Their contact with other programs is through fixtures the spec writer or the
-test harness committed: inputs, expected outputs and hashes.
+test harness committed: inputs, expected outputs and hashes. Where a
+specification publishes code as its normative part, only the spec writer reads
+that code, describes it by behaviour in their own words, cites the RFC section
+or specification clause, and never transliterates its C structure (control
+flow, function split, naming or data layout). Because no normative reference
+code enters alveus, no code licence carries over from it
+([ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)).
 
 The pull request names who held which role.
 
@@ -106,9 +120,15 @@ The pull request names who held which role.
 The spec writer may run any program, including the FFmpeg command-line tool,
 as a black box: feed it inputs, record outputs, hashes and error behaviour.
 The record is a measurement and may be committed as a fixture. Reading the
-program's source is not observation and stays forbidden. Whether its help
-output and user documentation may supply option names is an
-[open question](#open-questions); until it is decided, they may not.
+program's source is not observation and stays forbidden. What the program
+prints when run, including its help output, counts as an observation that
+only the spec writer records, as a measurement
+([ADR-0002](docs/adr/0002-command-line-names-from-observation.md)). User
+documentation and man pages live in the source tree and are not allowed
+inputs. Command-line option names for the compatibility levels in
+[docs/plan/scope-matrix.md](docs/plan/scope-matrix.md) reach the implementer
+only through spec notes and the fixtures the spec writer commits, such as the
+command-line corpus of level L2.
 
 ### Agent sessions and lanes
 
@@ -147,7 +167,10 @@ Three checks cover it, and each catches a different failure:
 
 1. Review: the maintainer rejects a pull request whose attestation is missing,
    incomplete or contradicted by its content, for example code whose
-   behaviour no cited clause describes.
+   behaviour no cited clause describes, or spec notes that transliterate the
+   structure of normative reference code (control flow, function split,
+   naming or data layout) instead of describing its behaviour
+   ([ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)).
 2. The attestation check: a mechanical check that fails a pull request whose
    attestation block is missing, has an unchecked box, or has an empty or
    placeholder field. It checks that the attestation is complete, not that
@@ -208,18 +231,13 @@ work or someone else's:
    [docs/adr/](docs/adr/). That record names the rewrite procedure, the
    temporary ruleset change it needs, and the notice sent to known forks.
 
-## Open questions
+## Decided questions
 
-These are decided before the work that needs them starts, and recorded as
-decision records under [docs/adr/](docs/adr/):
+Questions that were open when this policy was drafted are recorded as decision
+records under [docs/adr/](docs/adr/):
 
-- **Normative reference code in specifications.** Some specifications publish
-  code as their normative part, for example the Opus reference
-  implementation in RFC 6716. Whether a spec writer may read that code, and
-  how its licence carries over, is decided before the Opus milestone.
-- **Command-line naming.** Whether option names for the command-line
-  compatibility levels in
-  [docs/plan/scope-matrix.md](docs/plan/scope-matrix.md) may come from FFmpeg's
-  published user documentation or help output, or only from observed
-  behaviour, is decided before compatibility level L1 starts. Until then,
-  neither documentation nor help output is an input.
+- Command-line option names come from black-box observation, help output
+  included ([ADR-0002](docs/adr/0002-command-line-names-from-observation.md)).
+- Normative reference code in specifications is read by the spec writer only,
+  and carries no code licence into alveus
+  ([ADR-0003](docs/adr/0003-normative-reference-code-in-specifications.md)).
