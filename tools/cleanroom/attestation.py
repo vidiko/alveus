@@ -83,7 +83,7 @@ def _strip_fenced_code(text: str) -> str:
     """Drop CommonMark fenced code block lines in a single bounded pass."""
     kept: list[str] = []
     fence: str | None = None
-    for line in text.splitlines():
+    for line in text.split("\n"):
         if fence is None:
             open_match = _FENCE_OPEN_RE.match(line)
             if open_match is not None:
@@ -128,7 +128,7 @@ def _extract_blocks(text: str) -> list[list[str]]:
     """Return the line lists of all Clean-Room Attestation sections in text."""
     blocks: list[list[str]] = []
     current: list[str] | None = None
-    for line in text.splitlines():
+    for line in text.split("\n"):
         match = _HEADING_RE.match(line)
         if match is not None:
             level = match.group(1)

@@ -32,6 +32,8 @@ PASS_FIXTURES: tuple[str, ...] = (
     "autolink-inputs.md",
     "heading-forms.md",
     "fenced-example.md",
+    "indented-backticks.md",
+    "backtick-info-string.md",
 )
 
 # (fixture filename, expected problem code set, expected problem count).
@@ -56,6 +58,8 @@ FAIL_FIXTURES: tuple[tuple[str, frozenset[str], int], ...] = (
     ("wrong-level-h1.md", frozenset({"missing-block"}), 1),
     ("paragraph-answer.md", frozenset({"empty-field"}), 1),
     ("indented-code-heading.md", frozenset({"missing-block"}), 1),
+    ("tilde-fence-backtick-close.md", frozenset({"missing-block"}), 1),
+    ("long-fence-short-close.md", frozenset({"missing-block"}), 1),
 )
 
 FAIL_DETAIL_EXPECTATIONS: dict[str, str] = {
@@ -72,6 +76,23 @@ PLACEHOLDER_CASES: tuple[tuple[str, bool], ...] = (
     ("<https://a.b/c>", False),
     ("<a@b.org>", False),
     ("None.", False),
+    ("<a:b>", True),
+    ("<ab:c>", False),
+    ("<" + "a" * 32 + ":x>", False),
+    ("<" + "a" * 33 + ":x>", True),
+    ("<http://x y>", True),
+    ("<TODO: fill in>", True),
+)
+
+NON_LINE_SEPARATORS: tuple[tuple[str, str], ...] = (
+    ("u000b-vt", "\x0b"),
+    ("u000c-ff", "\x0c"),
+    ("u001c-fs", "\x1c"),
+    ("u001d-gs", "\x1d"),
+    ("u001e-rs", "\x1e"),
+    ("u0085-nel", "\x85"),
+    ("u2028-ls", "\u2028"),
+    ("u2029-ps", "\u2029"),
 )
 
 
@@ -173,7 +194,7 @@ def _run_inprocess_main(argv: list[str]) -> tuple[int, str, str]:
 
 
 def _check_pass_fixtures(spec: Any, tmp_dir: Path) -> tuple[int, int]:
-    """Run every passing fixture and the runtime CRLF fixture in-process."""
+    """Run every passing fixture and the runtime CRLF and CR fixtures."""
     cases = 0
     bad = 0
     for name in PASS_FIXTURES:
@@ -185,21 +206,23 @@ def _check_pass_fixtures(spec: Any, tmp_dir: Path) -> tuple[int, int]:
         ok = not problems and rc == 0 and out.strip() == "attestation: pass"
         bad += not _report(f"pass/{name}", ok, f"rc={rc} problems={problems!r}")
         cases += 1
-    crlf_text = (
+    base_complete = (
         (FIXTURES / "pass/complete.md")
         .read_text(encoding="utf-8")
         .replace("\r\n", "\n")
-        .replace("\n", "\r\n")
     )
-    crlf_path = tmp_dir / "complete-crlf.md"
-    crlf_path.write_bytes(crlf_text.encode("utf-8"))
-    problems = MOD.check_body(spec, crlf_text)
-    rc, out, _ = _run_inprocess_main(
-        ["--template", str(TEMPLATE), "--body", str(crlf_path)]
-    )
-    ok = not problems and rc == 0 and out.strip() == "attestation: pass"
-    bad += not _report("pass/complete-crlf", ok, f"rc={rc} problems={problems!r}")
-    return cases + 1, bad
+    for stem, newline in (("complete-crlf", "\r\n"), ("complete-cr", "\r")):
+        alt_text = base_complete.replace("\n", newline)
+        alt_path = tmp_dir / f"{stem}.md"
+        alt_path.write_bytes(alt_text.encode("utf-8"))
+        problems = MOD.check_body(spec, alt_text)
+        rc, out, _ = _run_inprocess_main(
+            ["--template", str(TEMPLATE), "--body", str(alt_path)]
+        )
+        ok = not problems and rc == 0 and out.strip() == "attestation: pass"
+        bad += not _report(f"pass/{stem}", ok, f"rc={rc} problems={problems!r}")
+        cases += 1
+    return cases, bad
 
 
 def _check_fail_fixtures(spec: Any) -> tuple[int, int]:
@@ -237,6 +260,28 @@ def _check_fail_fixtures(spec: Any) -> tuple[int, int]:
         bad += not _report(label, ok, f"codes={set(got_codes)!r}")
         cases += 1
     return cases, bad
+
+
+def _check_line_separators(spec: Any) -> tuple[int, int]:
+    """Reject non-CommonMark line separators before the attestation heading."""
+    base = (FIXTURES / "pass/complete.md").read_text(encoding="utf-8")
+    target = "\n## Clean-Room Attestation"
+    bad = 0
+    for label, sep in NON_LINE_SEPARATORS:
+        body = base.replace(target, f"\nSee notes.{sep}## Clean-Room Attestation", 1)
+        problems = MOD.check_body(spec, body)
+        got_codes = frozenset(item.code for item in problems)
+        ok = (
+            target in base
+            and got_codes == frozenset({"missing-block"})
+            and len(problems) == 1
+        )
+        bad += not _report(
+            f"separator/{label}",
+            ok,
+            f"codes={set(got_codes)!r} count={len(problems)}",
+        )
+    return len(NON_LINE_SEPARATORS), bad
 
 
 def _check_placeholder_cases() -> tuple[int, int]:
@@ -328,6 +373,7 @@ def main() -> int:
             _check_fixture_inventory(),
             _check_pass_fixtures(spec, tmp_dir),
             _check_fail_fixtures(spec),
+            _check_line_separators(spec),
             _check_placeholder_cases(),
             _check_boundaries(spec),
             _check_cli_cases(tmp_dir),
