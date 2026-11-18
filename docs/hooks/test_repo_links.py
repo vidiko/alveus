@@ -6,8 +6,7 @@
 
 from __future__ import annotations
 
-import importlib.util
-import logging
+import importlib
 import sys
 import types
 from html.parser import HTMLParser
@@ -17,13 +16,9 @@ from typing import Any
 import markdown
 
 ROOT = Path(sys.argv[1]).resolve()
-SPEC = importlib.util.spec_from_file_location(
-    "repo_links", ROOT / "docs/hooks/repo_links.py"
-)
-if SPEC is None or SPEC.loader is None:
-    raise RuntimeError("Failed to load docs/hooks/repo_links.py")
-MOD = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(MOD)
+sys.path.append(str(ROOT / "docs/hooks"))
+hooktest = importlib.import_module("hooktest")
+MOD = hooktest.load_hook(ROOT, "repo_links")
 
 CFG: dict[str, Any] = {
     "repo_url": "https://github.com/vidiko/alveus",
@@ -197,19 +192,6 @@ CASES: list[tuple[str, str, str, list[str], list[str], int]] = [
 ]
 
 
-class _ListHandler(logging.Handler):
-    """Capture warning records emitted by the hook logger during a test case."""
-
-    def __init__(self) -> None:
-        """Start with no captured messages at warning level."""
-        super().__init__(level=logging.WARNING)
-        self.messages: list[str] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        """Store the formatted message of one log record."""
-        self.messages.append(record.getMessage())
-
-
 class _HtmlCollector(HTMLParser):
     """Collect anchor hrefs, image sources and code text from rendered HTML."""
 
@@ -262,16 +244,11 @@ def _run_case(
     page = types.SimpleNamespace(
         file=types.SimpleNamespace(src_uri=page_uri, src_path=page_uri)
     )
-    logger = logging.getLogger("mkdocs.hooks.repo_links")
-    handler = _ListHandler()
-    logger.addHandler(handler)
-    try:
+    with hooktest.capture_warnings("mkdocs.hooks.repo_links") as handler:
         md_input = MOD.on_page_markdown(src, page, cfg, None)
         # mkdocs.yml loads pymdownx.superfences ahead of the hook; match it.
         md = markdown.Markdown(extensions=["pymdownx.superfences", ext])
         html = md.convert(md_input)
-    finally:
-        logger.removeHandler(handler)
     collector = _HtmlCollector()
     collector.feed(html)
     collector.close()
