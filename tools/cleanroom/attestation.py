@@ -43,11 +43,19 @@ PLACEHOLDERS: frozenset[str] = frozenset(
     }
 )
 
-_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-_HEADING_RE = re.compile(r"^(#{1,2})(?:[ \t]+(.*?))?[ \t]*$")
+_COMMENT_RE = re.compile(r"<!--(?:.*?-->|.*)", re.DOTALL)
+_FENCE_OPEN_RE = re.compile(r"^ {0,3}(?:(`{3,})[^`]*|(~{3,}).*)$")
+_FENCE_CLOSE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})[ \t]*$")
+_HEADING_RE = re.compile(r"^ {0,3}(#{1,2})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")
 _BOX_RE = re.compile(r"^[ \t]*[-*][ \t]+\[([ xX])\](?:[ \t]+(.*))?$")
 _FIELD_RE = re.compile(r"^\*\*([^*\n]+)\*\*")
 _BULLET_RE = re.compile(r"^[ \t]*[-*](?:[ \t]+(.*))?$")
+_URI_AUTOLINK_RE = re.compile(r"^<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>$")
+_EMAIL_AUTOLINK_RE = re.compile(
+    r"^<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9]"
+    r"(?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*>$"
+)
 
 
 @dataclass(frozen=True)
@@ -71,10 +79,33 @@ def _collapse(parts: Sequence[str]) -> str:
     return " ".join(" ".join(parts).split())
 
 
+def _strip_fenced_code(text: str) -> str:
+    """Drop CommonMark fenced code block lines in a single bounded pass."""
+    kept: list[str] = []
+    fence: str | None = None
+    for line in text.splitlines():
+        if fence is None:
+            open_match = _FENCE_OPEN_RE.match(line)
+            if open_match is not None:
+                fence = open_match.group(1) or open_match.group(2)
+                continue
+            kept.append(line)
+        else:
+            close_match = _FENCE_CLOSE_RE.match(line)
+            if (
+                close_match is not None
+                and close_match.group(1)[0] == fence[0]
+                and len(close_match.group(1)) >= len(fence)
+            ):
+                fence = None
+    return "\n".join(kept)
+
+
 def _clean_text(raw: str) -> str:
-    """Normalise CRLF and CR line endings to LF and strip HTML comments."""
+    """Normalise line endings and strip HTML comments and fenced code blocks."""
     normalised = raw.replace("\r\n", "\n").replace("\r", "\n")
-    return _COMMENT_RE.sub("", normalised)
+    uncommented = _COMMENT_RE.sub("", normalised)
+    return _strip_fenced_code(uncommented)
 
 
 def is_placeholder(item: str) -> bool:
@@ -85,7 +116,10 @@ def is_placeholder(item: str) -> bool:
     if all(ch in "-.…?" for ch in text):
         return True
     if text.startswith("<") and text.endswith(">"):
-        return True
+        return (
+            _URI_AUTOLINK_RE.match(text) is None
+            and _EMAIL_AUTOLINK_RE.match(text) is None
+        )
     lowered = text.casefold()
     return lowered in PLACEHOLDERS or lowered.rstrip(".:") in PLACEHOLDERS
 
@@ -215,7 +249,13 @@ def _check_fields(spec: TemplateSpec, block: Sequence[str]) -> list[Problem]:
             continue
         items = found[label]
         if not any(item for item in items):
-            problems.append(Problem("empty-field", f"field '{label}' has no content"))
+            problems.append(
+                Problem(
+                    "empty-field",
+                    f"field '{label}' has no list item with text; "
+                    'write each answer as a "- " list item',
+                )
+            )
         elif any(is_placeholder(item) for item in items):
             problems.append(
                 Problem(

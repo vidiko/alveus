@@ -29,6 +29,9 @@ PASS_FIXTURES: tuple[str, ...] = (
     "complete-uppercase-reflowed.md",
     "complete-none-exposure.md",
     "complete-extra-sections.md",
+    "autolink-inputs.md",
+    "heading-forms.md",
+    "fenced-example.md",
 )
 
 # (fixture filename, expected problem code set, expected problem count).
@@ -47,6 +50,28 @@ FAIL_FIXTURES: tuple[tuple[str, frozenset[str], int], ...] = (
     ("comment-only-field.md", frozenset({"empty-field"}), 1),
     ("duplicate-block.md", frozenset({"duplicate-block"}), 1),
     ("wrong-level-heading.md", frozenset({"missing-block"}), 1),
+    ("unclosed-comment.md", frozenset({"missing-block"}), 1),
+    ("fenced-block.md", frozenset({"missing-block"}), 1),
+    ("unclosed-fence.md", frozenset({"missing-block"}), 1),
+    ("wrong-level-h1.md", frozenset({"missing-block"}), 1),
+    ("paragraph-answer.md", frozenset({"empty-field"}), 1),
+    ("indented-code-heading.md", frozenset({"missing-block"}), 1),
+)
+
+FAIL_DETAIL_EXPECTATIONS: dict[str, str] = {
+    "paragraph-answer.md": (
+        "field 'Past exposure to disclose' has no list item with text; "
+        'write each answer as a "- " list item'
+    ),
+}
+
+PLACEHOLDER_CASES: tuple[tuple[str, bool], ...] = (
+    ("<document and clause>", True),
+    ("<>", True),
+    ("< https://x >", True),
+    ("<https://a.b/c>", False),
+    ("<a@b.org>", False),
+    ("None.", False),
 )
 
 
@@ -189,6 +214,7 @@ def _check_fail_fixtures(spec: Any) -> tuple[int, int]:
             ["--template", str(TEMPLATE), "--body", str(path)]
         )
         want_tail = f"attestation: fail ({want_count} problems)"
+        want_detail = FAIL_DETAIL_EXPECTATIONS.get(name)
         lines = out.strip().splitlines()
         ok = (
             rc == 1
@@ -196,6 +222,7 @@ def _check_fail_fixtures(spec: Any) -> tuple[int, int]:
             and len(problems) == want_count
             and len(lines) == want_count + 1
             and lines[-1] == want_tail
+            and (want_detail is None or problems[0].detail == want_detail)
         )
         bad += not _report(
             f"fail/{name}",
@@ -210,6 +237,19 @@ def _check_fail_fixtures(spec: Any) -> tuple[int, int]:
         bad += not _report(label, ok, f"codes={set(got_codes)!r}")
         cases += 1
     return cases, bad
+
+
+def _check_placeholder_cases() -> tuple[int, int]:
+    """Check unit cases for MOD.is_placeholder including CommonMark autolinks."""
+    bad = 0
+    for item, want in PLACEHOLDER_CASES:
+        got = MOD.is_placeholder(item)
+        bad += not _report(
+            f"placeholder/{item}",
+            got is want,
+            f"got={got!r} want={want!r}",
+        )
+    return len(PLACEHOLDER_CASES), bad
 
 
 def _check_boundaries(spec: Any) -> tuple[int, int]:
@@ -288,6 +328,7 @@ def main() -> int:
             _check_fixture_inventory(),
             _check_pass_fixtures(spec, tmp_dir),
             _check_fail_fixtures(spec),
+            _check_placeholder_cases(),
             _check_boundaries(spec),
             _check_cli_cases(tmp_dir),
         ):
