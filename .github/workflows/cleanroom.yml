@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: read  # the body step reads the live pull request body
     steps:
       - name: Stop on a draft pull request
         if: github.event.pull_request.draft == true
