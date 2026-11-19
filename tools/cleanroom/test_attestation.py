@@ -378,6 +378,28 @@ RENDER_CASES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         "## <span>Clean-Room</span> Notes\n",
         frozenset({"missing-block"}),
     ),
+    (
+        "box-after-nested-ordered",
+        "- [x] While",
+        "1. Intro.\n\n   - nested\n2. [x] While",
+        frozenset({"missing-box"}),
+    ),
+    (
+        "em-label-alone",
+        (
+            "**Roles** (who wrote the spec notes, who wrote the implementation, per\n"
+            "component touched):"
+        ),
+        "*Roles*",
+        frozenset({"missing-field"}),
+    ),
+    # Heading match uses Unicode case folding (str.casefold), so long s folds to s.
+    (
+        "long-s-heading",
+        _H + "\n",
+        "## Clean-Room Atte\u017ftation\n",
+        frozenset(),
+    ),
 )
 
 # (case name, argv with {tpl}/{tmp}/{fx} slots, expected rc, expected output needle).
