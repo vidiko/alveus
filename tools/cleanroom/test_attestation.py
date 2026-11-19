@@ -400,6 +400,67 @@ RENDER_CASES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         "## Clean-Room Atte\u017ftation\n",
         frozenset(),
     ),
+    # html_block answers: blank tag-only blocks are placeholders, comment-only blocks empty.
+    (
+        "html-block-unterminated-comment",
+        _EXPOSURE_ANSWER,
+        "- <!--",
+        frozenset({"empty-field"}),
+    ),
+    (
+        "html-block-unterminated-comment-text",
+        _EXPOSURE_ANSWER,
+        "- <!--\n  TBD",
+        frozenset({"empty-field"}),
+    ),
+    (
+        "html-block-closed-comment-then-answer",
+        _EXPOSURE_ANSWER,
+        "- <!-- note -->\n  None.",
+        frozenset(),
+    ),
+    (
+        "html-block-empty-comment-then-answer",
+        _EXPOSURE_ANSWER,
+        "- <!--> None.",
+        frozenset(),
+    ),
+    (
+        "html-block-charref-placeholder",
+        _EXPOSURE_ANSWER,
+        "- <div>&#84;BD</div>",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "html-block-charref-blank",
+        _EXPOSURE_ANSWER,
+        "- <div>&#32;</div>",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "html-block-entity-angle-placeholder",
+        _EXPOSURE_ANSWER,
+        "- <div>&lt;fill in&gt;</div>",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "html-block-visible-answer",
+        _EXPOSURE_ANSWER,
+        "- <div>None.</div>",
+        frozenset(),
+    ),
+    (
+        "html-block-dash-comment-then-answer",
+        _EXPOSURE_ANSWER,
+        "- <!---> None.",
+        frozenset(),
+    ),
+    (
+        "html-block-attr-charref-tag-only",
+        _EXPOSURE_ANSWER,
+        '- <div title="&gt;"></div>',
+        frozenset({"placeholder-field"}),
+    ),
 )
 
 # (case name, argv with {tpl}/{tmp}/{fx} slots, expected rc, expected output needle).

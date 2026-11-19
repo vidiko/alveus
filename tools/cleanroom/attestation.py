@@ -12,13 +12,18 @@ The module-level constant ``PLACEHOLDERS`` holds the lowercase word and phrase
 tokens rejected as placeholder list items (in addition to empty items and
 punctuation-only items). Placeholder checks run on the visible text, i.e. the
 item with every ``<...>`` tag removed unless the whole item is a URI or email
-autolink. The answers ``none`` and ``None.`` are valid disclosures and are not
-in ``PLACEHOLDERS``.
+autolink. An answer written as an HTML block is read as its visible text:
+comments removed (an unterminated comment through the end of the block), tags
+removed and character references decoded; a block that shows no text but holds
+tags counts as a placeholder, and one that holds only comments counts as empty.
+The answers ``none`` and ``None.`` are valid disclosures and are not in
+``PLACEHOLDERS``.
 """
 
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import sys
@@ -58,7 +63,8 @@ PLACEHOLDERS: frozenset[str] = frozenset(
 )
 
 _BOX_MARKER_RE = re.compile(r"^\[([ xX])\](?:\s|$)")
-_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+# CommonMark 6.6: <!--> / <!---> close; 4.6: unterminated comments reach block end.
+_HTML_COMMENT_RE = re.compile(r"<!--(?:-?>|.*?-->|.*\Z)", re.DOTALL)
 _HTML_TAG_RE = re.compile(r"<[^<>]*>")
 _URI_AUTOLINK_RE = re.compile(r"^<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>$")
 _EMAIL_AUTOLINK_RE = re.compile(
@@ -197,6 +203,17 @@ def _parse_boxes(tokens: Sequence[Token]) -> list[tuple[bool, str]]:
     return boxes
 
 
+def _html_block_text(content: str) -> str:
+    """Read visible text: remove comments/tags, decode refs; blank blocks keep tags.
+    Tag-only answers are placeholders; comment-only answers are empty.
+    """
+    uncommented = _HTML_COMMENT_RE.sub("", content)
+    visible = html.unescape(_HTML_TAG_RE.sub("", uncommented))
+    if visible.strip():
+        return visible
+    return "".join(_HTML_TAG_RE.findall(uncommented))
+
+
 def _collect_answer_token(
     tokens: Sequence[Token],
     index: int,
@@ -238,7 +255,7 @@ def _collect_answer_token(
         and item_stack[-1][2] is not None
         and token.level == item_stack[-1][0] + 1
     ):
-        item_stack[-1][2].append(_HTML_COMMENT_RE.sub("", token.content))
+        item_stack[-1][2].append(_html_block_text(token.content))
 
 
 def _parse_fields(tokens: Sequence[Token]) -> dict[str, list[str]]:
