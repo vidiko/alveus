@@ -461,6 +461,42 @@ RENDER_CASES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
         '- <div title="&gt;"></div>',
         frozenset({"placeholder-field"}),
     ),
+    (
+        "html-block-quoted-attr-gt-then-tbd",
+        _EXPOSURE_ANSWER,
+        '- <div title=">">TBD</div>',
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "html-block-quoted-attr-gt-tag-only",
+        _EXPOSURE_ANSWER,
+        '- <div title=">"></div>',
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "html-block-single-quoted-attr-gt-then-tbd",
+        _EXPOSURE_ANSWER,
+        "- <div title='>'>TBD</div>",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "html-block-quoted-attr-gt-then-answer",
+        _EXPOSURE_ANSWER,
+        '- <div title=">">None.</div>',
+        frozenset(),
+    ),
+    (
+        "html-block-apostrophe-placeholder",
+        _EXPOSURE_ANSWER,
+        "- <div><maintainer's name></div>",
+        frozenset({"placeholder-field"}),
+    ),
+    (
+        "html-block-unclosed-quote-then-tbd",
+        _EXPOSURE_ANSWER,
+        '- <div title=">TBD',
+        frozenset({"placeholder-field"}),
+    ),
 )
 
 # (case name, argv with {tpl}/{tmp}/{fx} slots, expected rc, expected output needle).

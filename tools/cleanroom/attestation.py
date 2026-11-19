@@ -66,6 +66,8 @@ _BOX_MARKER_RE = re.compile(r"^\[([ xX])\](?:\s|$)")
 # CommonMark 6.6: <!--> / <!---> close; 4.6: unterminated comments reach block end.
 _HTML_COMMENT_RE = re.compile(r"<!--(?:-?>|.*?-->|.*\Z)", re.DOTALL)
 _HTML_TAG_RE = re.compile(r"<[^<>]*>")
+# CommonMark 6.6: quoted attribute values may contain >.
+_HTML_BLOCK_TAG_RE = re.compile(r"""<(?:[^<>"']|"[^"]*"|'[^']*')*>""")
 _URI_AUTOLINK_RE = re.compile(r"^<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>$")
 _EMAIL_AUTOLINK_RE = re.compile(
     r"^<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9]"
@@ -204,14 +206,14 @@ def _parse_boxes(tokens: Sequence[Token]) -> list[tuple[bool, str]]:
 
 
 def _html_block_text(content: str) -> str:
-    """Read visible text: remove comments/tags, decode refs; blank blocks keep tags.
+    """Read visible text, decoding refs; blank tagged blocks return ``<>``.
     Tag-only answers are placeholders; comment-only answers are empty.
     """
     uncommented = _HTML_COMMENT_RE.sub("", content)
-    visible = html.unescape(_HTML_TAG_RE.sub("", uncommented))
+    visible = html.unescape(_HTML_BLOCK_TAG_RE.sub("", uncommented))
     if visible.strip():
         return visible
-    return "".join(_HTML_TAG_RE.findall(uncommented))
+    return "<>" if _HTML_BLOCK_TAG_RE.search(uncommented) else ""
 
 
 def _collect_answer_token(
