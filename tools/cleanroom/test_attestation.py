@@ -34,6 +34,8 @@ PASS_FIXTURES: tuple[str, ...] = (
     "fenced-example.md",
     "indented-backticks.md",
     "backtick-info-string.md",
+    "complete-star-answers.md",
+    "complete-plus-answers.md",
 )
 
 # (fixture filename, expected problem code set, expected problem count).
@@ -198,6 +200,29 @@ RENDER_CASES: tuple[tuple[str, str, str, frozenset[str]], ...] = (
     ),
     ("dash-break-answer", _ROLES_ANSWER, "- - -", frozenset({"empty-field"})),
     ("star-break-answer", _ROLES_ANSWER, "* * *", frozenset({"empty-field"})),
+    ("star-answer-tbd", _ROLES_ANSWER, "* TBD", frozenset({"placeholder-field"})),
+    ("plus-answer-tbd", _ROLES_ANSWER, "+ TBD", frozenset({"placeholder-field"})),
+    ("star-answer-empty", _ROLES_ANSWER, "*", frozenset({"empty-field"})),
+    ("plus-answer-empty", _ROLES_ANSWER, "+", frozenset({"empty-field"})),
+    ("star-no-space-answer", _ROLES_ANSWER, "*TBD", frozenset({"empty-field"})),
+    ("plus-no-space-answer", _ROLES_ANSWER, "+TBD", frozenset({"empty-field"})),
+    (
+        "mixed-markers-between-fields",
+        _ROLES_ANSWER + "\n\n" + _EXPOSURE_LABEL + "\n\n" + _EXPOSURE_ANSWER,
+        "* "
+        + _ROLES_ANSWER[2:]
+        + "\n\n"
+        + _EXPOSURE_LABEL
+        + "\n\n+ "
+        + _EXPOSURE_ANSWER[2:],
+        frozenset(),
+    ),
+    (
+        "mixed-markers-in-one-field",
+        "\n- docs/plan/milestones.md",
+        "\n* docs/plan/milestones.md",
+        frozenset(),
+    ),
     ("list-then-dashes", "source exposure.\n", "source exposure.\n---\n", frozenset()),
     ("break-after-blank", "\n**Inputs used**", "\n---\n\n**Inputs used**", frozenset()),
     (
