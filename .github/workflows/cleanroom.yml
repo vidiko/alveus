@@ -1,0 +1,81 @@
+---
+# SPDX-FileCopyrightText: 2026 Lusoris <lusoris@pm.me>
+# SPDX-License-Identifier: EUPL-1.2
+#
+# Mechanical clean-room attestation completeness check (check 2 of
+# CLEANROOM.md, section "Attestation"). Reruns whenever a pull request
+# description is edited (`edited`) as well as on commits and state transitions.
+# Uses `pull_request`, never `pull_request_target`, because GitHub blocks
+# `pull_request_target` by default in public repositories from 2026-12-02
+# (GitHub Changelog, 2026-11-02). The pull request body is fetched from the
+# GitHub API on each run into `$RUNNER_TEMP/body.md`, so reruns check the live
+# description and never interpolate it into a shell line.
+name: Clean-room
+
+'on':
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  push:
+    branches: ['main']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: >-
+    ${{ github.workflow }}-${{ github.event.pull_request.number ||
+    github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  attestation:
+    name: Clean-room attestation
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read  # the body step reads the live pull request body
+    steps:
+      - name: Stop on a draft pull request
+        if: github.event.pull_request.draft == true
+        shell: bash
+        env:
+          TITLE: Gate not run on a draft
+          MESSAGE: >-
+            The gate did not run because the pull request is a draft.
+            It runs when the pull request is marked ready for review.
+        run: |
+          echo "::error title=$TITLE::$MESSAGE"
+          echo "$MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+      - name: Check out the source
+        # yamllint disable-line rule:line-length
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the clean-room tools
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cleanroom"
+          timeout 180 "$RUNNER_TEMP/cleanroom/bin/python" -m pip install \
+            --require-hashes --only-binary=:all: --timeout=30 \
+            -r tools/cleanroom/requirements.txt
+      - name: Test the attestation check
+        run: |
+          "$RUNNER_TEMP/cleanroom/bin/python" -I -B \
+            tools/cleanroom/test_attestation.py .
+      - name: Fetch the pull request body
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          timeout 60 gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '.body // ""' > "$RUNNER_TEMP/body.md"
+      - name: Check the attestation
+        if: github.event_name == 'pull_request'
+        run: |
+          "$RUNNER_TEMP/cleanroom/bin/python" -I -B \
+            tools/cleanroom/attestation.py \
+            --template .github/pull_request_template.md \
+            --body "$RUNNER_TEMP/body.md" \
+            --annotations

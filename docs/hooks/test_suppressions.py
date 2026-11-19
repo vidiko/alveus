@@ -15,8 +15,11 @@ BANDIT = "no" + "sec"
 SEMGREP = "no" + "semgrep"
 MARKER = re.compile(r"#.*?\b(?:" + BANDIT + "|" + SEMGREP + r")\b")
 RULES = re.compile(
-    r"# (?:" + BANDIT + r" B\d{3}(?:, B\d{3})*|"
-    + SEMGREP + r": [a-z0-9][a-z0-9.-]*(?:, [a-z0-9][a-z0-9.-]*)*)"
+    r"# (?:"
+    + BANDIT
+    + r" B\d{3}(?:, B\d{3})*|"
+    + SEMGREP
+    + r": [a-z0-9][a-z0-9.-]*(?:, [a-z0-9][a-z0-9.-]*)*)"
     + r"  # (\S+(?:\s+\S+)+)\s*$"
 )
 
@@ -24,7 +27,7 @@ RULES = re.compile(
 def valid(line: str) -> bool:
     """Accept unmarked lines or a complete suppression with a reason."""
     marker = MARKER.search(line)
-    return marker is None or RULES.fullmatch(line[marker.start():]) is not None
+    return marker is None or RULES.fullmatch(line[marker.start() :]) is not None
 
 
 def main() -> int:
@@ -50,6 +53,7 @@ def main() -> int:
         print("ok  " if ok else "FAIL", name)
         bad += not ok
     paths = sorted((ROOT / "docs/hooks").glob("*.py"))
+    paths += sorted((ROOT / "tools").rglob("*.py"))
     paths += sorted((ROOT / ".github/workflows").glob("*.yml"))
     violations = [
         f"{path.relative_to(ROOT)}:{number}"
